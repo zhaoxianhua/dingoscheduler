@@ -1,0 +1,30 @@
+server:
+    mode: debug
+    host: 0.0.0.0
+    port: 9090
+    pprof: true
+    pprofPort: 7060
+    metrics: true
+
+bizDB:
+    type: "mysql"
+    host: "172.30.14.123"
+    port: 3306
+    user: "dingo"
+    password: "6XY3i+*hW4^5K7a2d@"
+    database: "dingoscheduler"
+    timeout: "10s"
+    maxConn: 100
+    maxIdleConn: 10
+
+scheduler:
+    port: 9091
+
+retry:
+    delay: 1       #重试间隔时间，单位秒，默认为1
+    attempts: 3    #重试次数，默认为3
+
+log:
+    maxSize: 20      # 日志文件最大的尺寸（MB）
+    maxBackups: 10  #保留旧文件的最大个数
+    maxAge: 90      #保留旧文件的最大天数
