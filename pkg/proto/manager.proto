@@ -13,12 +13,15 @@ service Manager {
     rpc Heartbeat (HeartbeatRequest) returns (google.protobuf.Empty);
 
     rpc ReportCompleteFile (CompleteFileRequest) returns (google.protobuf.Empty);
+
+    rpc SchedulerFile (SchedulerFileRequest) returns (SchedulerFileResponse);
+
 }
 
 
 // 注册请求
 message RegisterRequest {
-string area = 1;
+string areaInstance = 1;
 string host = 2;
 int32 port = 3;
 }
@@ -42,6 +45,19 @@ message CompleteFile{
     string dataType = 1;
     string org = 2;
     string repo = 3;
-    string path = 4;
-    int32 dingospeedId = 5;
+    string etag = 4;
+    string areaInstance = 5;
+}
+
+message SchedulerFileRequest {
+    string dataType = 1;
+    string org = 2;
+    string repo = 3;
+    string etag = 4;
+}
+
+// 注册响应
+message SchedulerFileResponse {
+    string host = 1;
+    int32 port = 2;
 }

@@ -22,6 +22,7 @@ import (
 
 	"dingoscheduler/internal/dao"
 	"dingoscheduler/internal/model"
+	"dingoscheduler/internal/model/query"
 	myerr "dingoscheduler/pkg/error"
 	pb "dingoscheduler/pkg/proto/manager"
 
@@ -45,13 +46,13 @@ func NewManagerService(dingospeedDao *dao.DingospeedDao, modelFileRecordDao *dao
 
 func (s *ManagerService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	dingospeed := &model.Dingospeed{
-		Area:      req.Area,
-		Host:      req.Host,
-		Port:      req.Port,
-		UpdatedAt: time.Now(),
-		CreatedAt: time.Now(),
+		AreaInstance: req.AreaInstance,
+		Host:         req.Host,
+		Port:         req.Port,
+		UpdatedAt:    time.Now(),
+		CreatedAt:    time.Now(),
 	}
-	speed, err := s.dingospeedDao.GetEntity(req.Area, req.Host, req.Port)
+	speed, err := s.dingospeedDao.GetEntity(req.AreaInstance, req.Host, req.Port)
 	if err != nil {
 		zap.S().Errorf("getEntity err.%v", err)
 		return nil, err
@@ -96,8 +97,8 @@ func (s *ManagerService) ReportCompleteFile(ctx context.Context, req *pb.Complet
 			Datatype:     item.DataType,
 			Org:          item.Org,
 			Repo:         item.Repo,
-			Path:         item.Path,
-			DingospeedID: item.DingospeedId,
+			Etag:         item.Etag,
+			AreaInstance: item.AreaInstance,
 			CompleteAt:   time.Now(),
 		}
 		records = append(records, m)
@@ -107,4 +108,24 @@ func (s *ManagerService) ReportCompleteFile(ctx context.Context, req *pb.Complet
 		return nil, err
 	}
 	return nil, nil
+}
+
+func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFileRequest) (*pb.SchedulerFileResponse, error) {
+	records, err := s.modelFileRecordDao.FindModelFileRecords(&query.ModelFileRecordQuery{
+		Datatype: req.DataType,
+		Org:      req.Org,
+		Repo:     req.Repo,
+		Etag:     req.Etag,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(records) > 0 {
+		record := records[0]
+		return &pb.SchedulerFileResponse{
+			Host: record.Host,
+			Port: record.Port,
+		}, nil
+	}
+	return nil, myerr.New("No download records are available")
 }

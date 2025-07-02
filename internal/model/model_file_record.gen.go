@@ -16,8 +16,8 @@ type ModelFileRecord struct {
 	Datatype     string    `gorm:"column:datatype;not null" json:"datatype"`
 	Org          string    `gorm:"column:org;not null" json:"org"`
 	Repo         string    `gorm:"column:repo;not null" json:"repo"`
-	Path         string    `gorm:"column:path;not null" json:"path"`
-	DingospeedID int32     `gorm:"column:dingospeed_id;not null" json:"dingospeed_id"`
+	Etag         string    `gorm:"column:etag;not null" json:"etag"`
+	AreaInstance string    `gorm:"column:area_instance;not null" json:"area_instance"`
 	CompleteAt   time.Time `gorm:"column:complete_at;not null;default:CURRENT_TIMESTAMP" json:"complete_at"`
 }
 
