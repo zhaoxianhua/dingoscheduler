@@ -54,8 +54,8 @@ func (d *ModelFileProcessDao) Update(process *model.ModelFileProcess, startPos i
 
 func (d *ModelFileProcessDao) GetModelFileProcess(recordId int64) ([]*dto.ModelFileProcessDto, error) {
 	var processes []*dto.ModelFileProcessDto
-	if err := d.baseData.BizDB.Model(&model.ModelFileProcess{}).Select("model_file_process.*, t2.host, t2.port").
-		Joins("left join dingospeed t2 on model_file_process.instance_id = t2.instance_id").
+	if err := d.baseData.BizDB.Table("model_file_process t1").Select("t1.id, t1.record_id, t1.instance_id, t1.offset, t2.host, t2.port, t2.updated_at").
+		Joins("left join dingospeed t2 on t1.instance_id = t2.instance_id").
 		Where("record_id=?", recordId).Order("offset desc").Find(&processes).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil

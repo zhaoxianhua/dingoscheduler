@@ -15,7 +15,9 @@
 package dao
 
 import (
+	pb "dingoscheduler/pkg/proto/manager"
 	"errors"
+	"go.uber.org/zap"
 
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
@@ -70,4 +72,30 @@ func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecord
 		return nil, err
 	}
 	return &record, nil
+}
+
+func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, process *model.ModelFileProcess) error {
+	if err := d.baseData.BizDB.Transaction(func(tx *gorm.DB) error {
+		record := &model.ModelFileRecord{
+			Datatype: req.DataType,
+			Org:      req.Org,
+			Repo:     req.Repo,
+			Name:     req.Name,
+			Etag:     req.Etag,
+			FileSize: req.FileSize,
+		}
+		if err := tx.Create(record).Error; err != nil {
+			return err
+		}
+		process.RecordID = record.ID
+		process.Offset = 0 // 初始
+		if err := tx.Create(process).Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		zap.S().Error("SaveSchedulerRecord err.%v", err)
+		return err
+	}
+	return nil
 }

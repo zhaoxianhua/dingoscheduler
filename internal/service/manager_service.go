@@ -32,6 +32,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+var heartGap = 5 * time.Minute
+
 type ManagerService struct {
 	pb.UnimplementedManagerServer
 	clients             sync.Map // 使用 sync.Map 存储客户端信息
@@ -114,7 +116,8 @@ func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFil
 			for _, item := range processDtos {
 				// 标记要同步的process
 				tmp := item
-				if masterProcess == nil && item.InstanceID != req.InstanceId && item.Offset > req.StartPos {
+				if masterProcess == nil && item.InstanceID != req.InstanceId &&
+					item.Offset > req.StartPos && time.Now().Sub(item.UpdatedAt) <= heartGap {
 					masterProcess = tmp
 				}
 				processHistory[item.InstanceID] = tmp
@@ -160,20 +163,7 @@ func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFil
 		}
 		return resp, nil
 	} else {
-		record = &model.ModelFileRecord{
-			Datatype: req.DataType,
-			Org:      req.Org,
-			Repo:     req.Repo,
-			Name:     req.Name,
-			Etag:     req.Etag,
-			FileSize: req.FileSize,
-		}
-		if err = s.modelFileRecordDao.Save(record); err != nil {
-			return nil, err
-		}
-		process.RecordID = record.ID
-		process.Offset = 0 // 初始
-		if err = s.modelFileProcessDao.Save(process); err != nil {
+		if err = s.modelFileRecordDao.SaveSchedulerRecord(req, process); err != nil {
 			return nil, err
 		}
 		return &pb.SchedulerFileResponse{
