@@ -22,7 +22,9 @@ import (
 
 	"dingoscheduler/internal/dao"
 	"dingoscheduler/internal/model"
+	"dingoscheduler/internal/model/dto"
 	"dingoscheduler/internal/model/query"
+	"dingoscheduler/pkg/consts"
 	myerr "dingoscheduler/pkg/error"
 	pb "dingoscheduler/pkg/proto/manager"
 
@@ -32,39 +34,39 @@ import (
 
 type ManagerService struct {
 	pb.UnimplementedManagerServer
-	clients            sync.Map // 使用 sync.Map 存储客户端信息
-	dingospeedDao      *dao.DingospeedDao
-	modelFileRecordDao *dao.ModelFileRecordDao
+	clients             sync.Map // 使用 sync.Map 存储客户端信息
+	dingospeedDao       *dao.DingospeedDao
+	modelFileRecordDao  *dao.ModelFileRecordDao
+	modelFileProcessDao *dao.ModelFileProcessDao
 }
 
-func NewManagerService(dingospeedDao *dao.DingospeedDao, modelFileRecordDao *dao.ModelFileRecordDao) *ManagerService {
+func NewManagerService(dingospeedDao *dao.DingospeedDao, modelFileRecordDao *dao.ModelFileRecordDao, modelFileProcessDao *dao.ModelFileProcessDao) *ManagerService {
 	return &ManagerService{
-		dingospeedDao:      dingospeedDao,
-		modelFileRecordDao: modelFileRecordDao,
+		dingospeedDao:       dingospeedDao,
+		modelFileRecordDao:  modelFileRecordDao,
+		modelFileProcessDao: modelFileProcessDao,
 	}
 }
 
 func (s *ManagerService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	dingospeed := &model.Dingospeed{
-		AreaInstance: req.AreaInstance,
-		Host:         req.Host,
-		Port:         req.Port,
-		UpdatedAt:    time.Now(),
-		CreatedAt:    time.Now(),
+	dingospeed := model.Dingospeed{
+		InstanceID: req.InstanceId,
+		Host:       req.Host,
+		Port:       req.Port,
 	}
-	speed, err := s.dingospeedDao.GetEntity(req.AreaInstance, req.Host, req.Port)
+	speed, err := s.dingospeedDao.GetEntity(req.InstanceId)
 	if err != nil {
 		zap.S().Errorf("getEntity err.%v", err)
 		return nil, err
 	}
 	if speed != nil {
 		dingospeed.ID = speed.ID
-		err = s.dingospeedDao.Update(*dingospeed)
+		err = s.dingospeedDao.Update(&dingospeed)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		err = s.dingospeedDao.Save(*dingospeed)
+		err = s.dingospeedDao.Save(&dingospeed)
 		if err != nil {
 			return nil, err
 		}
@@ -87,31 +89,8 @@ func (s *ManagerService) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest
 	return nil, nil
 }
 
-func (s *ManagerService) ReportCompleteFile(ctx context.Context, req *pb.CompleteFileRequest) (*emptypb.Empty, error) {
-	if len(req.CompleteFiles) == 0 {
-		return nil, nil
-	}
-	records := make([]model.ModelFileRecord, 0)
-	for _, item := range req.CompleteFiles {
-		m := model.ModelFileRecord{
-			Datatype:     item.DataType,
-			Org:          item.Org,
-			Repo:         item.Repo,
-			Etag:         item.Etag,
-			AreaInstance: item.AreaInstance,
-			CompleteAt:   time.Now(),
-		}
-		records = append(records, m)
-	}
-	err := s.modelFileRecordDao.BatchSave(records)
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
-}
-
 func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFileRequest) (*pb.SchedulerFileResponse, error) {
-	records, err := s.modelFileRecordDao.FindModelFileRecords(&query.ModelFileRecordQuery{
+	record, err := s.modelFileRecordDao.GetModelFileRecord(&query.ModelFileRecordQuery{
 		Datatype: req.DataType,
 		Org:      req.Org,
 		Repo:     req.Repo,
@@ -120,12 +99,100 @@ func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFil
 	if err != nil {
 		return nil, err
 	}
-	if len(records) > 0 {
-		record := records[0]
+	process := &model.ModelFileProcess{
+		InstanceID: req.InstanceId,
+	}
+	if record != nil {
+		var resp = &pb.SchedulerFileResponse{}
+		processDtos, err := s.modelFileProcessDao.GetModelFileProcess(record.ID)
+		if err != nil {
+			return nil, err
+		}
+		if len(processDtos) > 0 {
+			processHistory := make(map[string]*dto.ModelFileProcessDto, 0)
+			var masterProcess *dto.ModelFileProcessDto
+			for _, item := range processDtos {
+				// 标记要同步的process
+				tmp := item
+				if masterProcess == nil && item.InstanceID != req.InstanceId && item.Offset > req.StartPos {
+					masterProcess = tmp
+				}
+				processHistory[item.InstanceID] = tmp
+			}
+			if masterProcess != nil {
+				resp.SchedulerType = consts.SchedulerYes
+				resp.MasterInstanceId = masterProcess.InstanceID
+				resp.Host = masterProcess.Host
+				resp.Port = masterProcess.Port
+				resp.MaxOffset = masterProcess.Offset
+				process.MasterInstanceID = masterProcess.InstanceID
+			} else {
+				resp.SchedulerType = consts.SchedulerNo
+				process.MasterInstanceID = ""
+			}
+			if processDto, ok := processHistory[req.InstanceId]; ok {
+				resp.ProcessId = processDto.ID
+				process.ID = processDto.ID
+				process.RecordID = processDto.RecordID
+				// 本地缓存被清空，数据库process将重新下载
+				if err = s.modelFileProcessDao.Update(process, 0); err != nil {
+					return nil, err
+				}
+				return resp, nil
+			} else {
+				process.RecordID = record.ID
+				if err = s.modelFileProcessDao.Save(process); err != nil {
+					return nil, err
+				}
+				resp.ProcessId = process.ID
+				return resp, nil
+			}
+		} else {
+			process.RecordID = record.ID
+			process.Offset = 0
+			if err = s.modelFileProcessDao.Save(process); err != nil {
+				return nil, err
+			}
+			resp = &pb.SchedulerFileResponse{
+				SchedulerType: consts.SchedulerNo,
+				ProcessId:     process.ID,
+			}
+		}
+		return resp, nil
+	} else {
+		record = &model.ModelFileRecord{
+			Datatype: req.DataType,
+			Org:      req.Org,
+			Repo:     req.Repo,
+			Name:     req.Name,
+			Etag:     req.Etag,
+			FileSize: req.FileSize,
+		}
+		if err = s.modelFileRecordDao.Save(record); err != nil {
+			return nil, err
+		}
+		process.RecordID = record.ID
+		process.Offset = 0 // 初始
+		if err = s.modelFileProcessDao.Save(process); err != nil {
+			return nil, err
+		}
 		return &pb.SchedulerFileResponse{
-			Host: record.Host,
-			Port: record.Port,
+			SchedulerType: consts.SchedulerNo,
+			ProcessId:     process.ID,
 		}, nil
 	}
-	return nil, myerr.New("No download records are available")
+}
+
+func (s *ManagerService) ReportFileProcess(ctx context.Context, req *pb.FileProcessRequest) (*emptypb.Empty, error) {
+	process := &model.ModelFileProcess{
+		ID:     req.ProcessId,
+		Status: req.Status,
+	}
+	if req.Status != consts.StatusDownloadBreak {
+		process.Offset = req.EndPos
+	}
+	if err := s.modelFileProcessDao.Update(process, req.StaPos); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }

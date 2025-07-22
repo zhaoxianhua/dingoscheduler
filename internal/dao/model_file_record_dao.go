@@ -15,10 +15,13 @@
 package dao
 
 import (
+	"errors"
+
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
-	"dingoscheduler/internal/model/dto"
 	"dingoscheduler/internal/model/query"
+
+	"gorm.io/gorm"
 )
 
 type ModelFileRecordDao struct {
@@ -31,6 +34,13 @@ func NewModelFileRecordDao(data *data.BaseData) *ModelFileRecordDao {
 	}
 }
 
+func (d *ModelFileRecordDao) Save(records *model.ModelFileRecord) error {
+	if err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Save(records).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
 func (d *ModelFileRecordDao) BatchSave(records []model.ModelFileRecord) error {
 	if err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).CreateInBatches(&records, 5).Error; err != nil {
 		return err
@@ -38,9 +48,9 @@ func (d *ModelFileRecordDao) BatchSave(records []model.ModelFileRecord) error {
 	return nil
 }
 
-func (d *ModelFileRecordDao) FindModelFileRecords(condition *query.ModelFileRecordQuery) ([]*dto.ModelFileRecordDto, error) {
-	records := make([]*dto.ModelFileRecordDto, 0)
-	db := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Select("model_file_record.*, dingospeed.host, dingospeed.port").Joins("left join dingospeed on model_file_record.area_instance = dingospeed.area_instance")
+func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecordQuery) (*model.ModelFileRecord, error) {
+	record := model.ModelFileRecord{}
+	db := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Select("id")
 	if condition.Datatype != "" {
 		db.Where("datatype = ?", condition.Datatype)
 	}
@@ -53,8 +63,11 @@ func (d *ModelFileRecordDao) FindModelFileRecords(condition *query.ModelFileReco
 	if condition.Etag != "" {
 		db.Where("etag = ?", condition.Etag)
 	}
-	if err := db.Order("complete_at desc").Find(&records).Error; err != nil {
+	if err := db.First(&record).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	return records, nil
+	return &record, nil
 }

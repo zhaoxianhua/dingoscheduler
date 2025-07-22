@@ -33,15 +33,15 @@ func NewDingospeedDao(data *data.BaseData) *DingospeedDao {
 	}
 }
 
-func (d *DingospeedDao) Save(Config model.Dingospeed) error {
-	if err := d.baseData.BizDB.Model(&model.Dingospeed{}).Save(&Config).Error; err != nil {
+func (d *DingospeedDao) Save(speed *model.Dingospeed) error {
+	if err := d.baseData.BizDB.Model(&model.Dingospeed{}).Save(speed).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func (d *DingospeedDao) Update(speed model.Dingospeed) error {
-	if err := d.baseData.BizDB.Model(&model.Dingospeed{}).Where("id=?", speed.ID).Updates(&speed).Error; err != nil {
+func (d *DingospeedDao) Update(speed *model.Dingospeed) error {
+	if err := d.baseData.BizDB.Model(&model.Dingospeed{}).Where("id=?", speed.ID).Updates(speed).Error; err != nil {
 		return err
 	}
 	return nil
@@ -62,9 +62,9 @@ func (d *DingospeedDao) GetEntityById(id int32) (*model.Dingospeed, error) {
 	return &speed, nil
 }
 
-func (d *DingospeedDao) GetEntity(area, host string, port int32) (*model.Dingospeed, error) {
+func (d *DingospeedDao) GetEntity(instanceId string) (*model.Dingospeed, error) {
 	var speed model.Dingospeed
-	if err := d.baseData.BizDB.Model(&model.Dingospeed{}).Where("area = ? and host=? and port=?", area, host, port).First(&speed).Error; err != nil {
+	if err := d.baseData.BizDB.Model(&model.Dingospeed{}).Where("instance_id = ?", instanceId).First(&speed).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}

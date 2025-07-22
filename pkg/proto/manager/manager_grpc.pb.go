@@ -20,10 +20,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Manager_Register_FullMethodName           = "/manager.Manager/Register"
-	Manager_Heartbeat_FullMethodName          = "/manager.Manager/Heartbeat"
-	Manager_ReportCompleteFile_FullMethodName = "/manager.Manager/ReportCompleteFile"
-	Manager_SchedulerFile_FullMethodName      = "/manager.Manager/SchedulerFile"
+	Manager_Register_FullMethodName          = "/manager.Manager/Register"
+	Manager_Heartbeat_FullMethodName         = "/manager.Manager/Heartbeat"
+	Manager_SchedulerFile_FullMethodName     = "/manager.Manager/SchedulerFile"
+	Manager_ReportFileProcess_FullMethodName = "/manager.Manager/ReportFileProcess"
 )
 
 // ManagerClient is the client API for Manager service.
@@ -32,12 +32,14 @@ const (
 //
 // 用户服务定义
 type ManagerClient interface {
-	// 注册方法
+	// 启动注册方法
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
 	// 心跳方法
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	ReportCompleteFile(ctx context.Context, in *CompleteFileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// 下载文件开始时，触发调度
 	SchedulerFile(ctx context.Context, in *SchedulerFileRequest, opts ...grpc.CallOption) (*SchedulerFileResponse, error)
+	// 文件下载结束，信息上报
+	ReportFileProcess(ctx context.Context, in *FileProcessRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type managerClient struct {
@@ -68,20 +70,20 @@ func (c *managerClient) Heartbeat(ctx context.Context, in *HeartbeatRequest, opt
 	return out, nil
 }
 
-func (c *managerClient) ReportCompleteFile(ctx context.Context, in *CompleteFileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *managerClient) SchedulerFile(ctx context.Context, in *SchedulerFileRequest, opts ...grpc.CallOption) (*SchedulerFileResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, Manager_ReportCompleteFile_FullMethodName, in, out, cOpts...)
+	out := new(SchedulerFileResponse)
+	err := c.cc.Invoke(ctx, Manager_SchedulerFile_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *managerClient) SchedulerFile(ctx context.Context, in *SchedulerFileRequest, opts ...grpc.CallOption) (*SchedulerFileResponse, error) {
+func (c *managerClient) ReportFileProcess(ctx context.Context, in *FileProcessRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SchedulerFileResponse)
-	err := c.cc.Invoke(ctx, Manager_SchedulerFile_FullMethodName, in, out, cOpts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Manager_ReportFileProcess_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -94,12 +96,14 @@ func (c *managerClient) SchedulerFile(ctx context.Context, in *SchedulerFileRequ
 //
 // 用户服务定义
 type ManagerServer interface {
-	// 注册方法
+	// 启动注册方法
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
 	// 心跳方法
 	Heartbeat(context.Context, *HeartbeatRequest) (*emptypb.Empty, error)
-	ReportCompleteFile(context.Context, *CompleteFileRequest) (*emptypb.Empty, error)
+	// 下载文件开始时，触发调度
 	SchedulerFile(context.Context, *SchedulerFileRequest) (*SchedulerFileResponse, error)
+	// 文件下载结束，信息上报
+	ReportFileProcess(context.Context, *FileProcessRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedManagerServer()
 }
 
@@ -116,11 +120,11 @@ func (UnimplementedManagerServer) Register(context.Context, *RegisterRequest) (*
 func (UnimplementedManagerServer) Heartbeat(context.Context, *HeartbeatRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
 }
-func (UnimplementedManagerServer) ReportCompleteFile(context.Context, *CompleteFileRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ReportCompleteFile not implemented")
-}
 func (UnimplementedManagerServer) SchedulerFile(context.Context, *SchedulerFileRequest) (*SchedulerFileResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SchedulerFile not implemented")
+}
+func (UnimplementedManagerServer) ReportFileProcess(context.Context, *FileProcessRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReportFileProcess not implemented")
 }
 func (UnimplementedManagerServer) mustEmbedUnimplementedManagerServer() {}
 func (UnimplementedManagerServer) testEmbeddedByValue()                 {}
@@ -179,24 +183,6 @@ func _Manager_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Manager_ReportCompleteFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CompleteFileRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ManagerServer).ReportCompleteFile(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Manager_ReportCompleteFile_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ManagerServer).ReportCompleteFile(ctx, req.(*CompleteFileRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Manager_SchedulerFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SchedulerFileRequest)
 	if err := dec(in); err != nil {
@@ -211,6 +197,24 @@ func _Manager_SchedulerFile_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ManagerServer).SchedulerFile(ctx, req.(*SchedulerFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Manager_ReportFileProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FileProcessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManagerServer).ReportFileProcess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Manager_ReportFileProcess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManagerServer).ReportFileProcess(ctx, req.(*FileProcessRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -231,12 +235,12 @@ var Manager_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Manager_Heartbeat_Handler,
 		},
 		{
-			MethodName: "ReportCompleteFile",
-			Handler:    _Manager_ReportCompleteFile_Handler,
-		},
-		{
 			MethodName: "SchedulerFile",
 			Handler:    _Manager_SchedulerFile_Handler,
+		},
+		{
+			MethodName: "ReportFileProcess",
+			Handler:    _Manager_ReportFileProcess_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

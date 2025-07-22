@@ -19,32 +19,13 @@ const (
 	DB_MYSQL = "mysql"
 )
 
-var RepoTypesMapping = map[string]RepoType{
-	"models":   RepoTypeModel,
-	"spaces":   RepoTypeSpace,
-	"datasets": RepoTypeDataset,
-}
-
-// repo类型
-type RepoType string
-
 const (
-	RepoTypeModel   RepoType = RepoType("models")
-	RepoTypeSpace            = RepoType("spaces")
-	RepoTypeDataset          = RepoType("datasets")
+	SchedulerNo  = 1
+	SchedulerYes = 2
 )
 
-func (a RepoType) Value() string {
-	return string(a)
-}
-
-const HUGGINGFACE_HEADER_X_REPO_COMMIT = "X-Repo-Commit"
-
 const (
-	RequestTypeHead = "head"
-	RequestTypeGet  = "get"
+	StatusDownloading   = 1
+	StatusDownloadBreak = 2
+	StatusDownloaded    = 3
 )
-
-const RespChanSize = 100
-const PromSource = "source"
-const PromOrgRepo = "orgRepo"

@@ -31,7 +31,8 @@ func wireApp(configConfig *config.Config) (*app.App, func(), error) {
 	}
 	dingospeedDao := dao.NewDingospeedDao(baseData)
 	modelFileRecordDao := dao.NewModelFileRecordDao(baseData)
-	managerService := service.NewManagerService(dingospeedDao, modelFileRecordDao)
+	modelFileProcessDao := dao.NewModelFileProcessDao(baseData)
+	managerService := service.NewManagerService(dingospeedDao, modelFileRecordDao, modelFileProcessDao)
 	managerHandler := handler.NewManagerHandler(managerService)
 	sysService := service.NewSysService()
 	sysHandler := handler.NewSysHandler(sysService)
