@@ -137,6 +137,9 @@ func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFil
 				resp.ProcessId = processDto.ID
 				process.ID = processDto.ID
 				process.RecordID = processDto.RecordID
+				if processDto.Offset > req.StartPos {
+					process.Offset = req.StartPos
+				}
 				// 本地缓存被清空，数据库process将重新下载
 				if err = s.modelFileProcessDao.Update(process, 0); err != nil {
 					return nil, err

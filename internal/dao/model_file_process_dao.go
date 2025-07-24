@@ -44,7 +44,7 @@ func (d *ModelFileProcessDao) Save(process *model.ModelFileProcess) error {
 func (d *ModelFileProcessDao) Update(process *model.ModelFileProcess, startPos int64) error {
 	db := d.baseData.BizDB.Model(&model.ModelFileProcess{})
 	if startPos != 0 {
-		db.Where("offset = ?", startPos)
+		db.Where("offset >= ?", startPos)
 	}
 	if err := db.Where("id=?", process.ID).Updates(process).Error; err != nil {
 		return err

@@ -5,6 +5,10 @@ server:
     pprof: true
     pprofPort: 7060
     metrics: true
+    ssl:
+        keyFile: config/ssl/server.key
+        crtFile: config/ssl/server.crt
+        caFile: config/ssl/ca.crt
 
 bizDB:
     type: "mysql"
