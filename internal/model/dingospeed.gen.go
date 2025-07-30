@@ -18,6 +18,7 @@ type Dingospeed struct {
 	Port       int32     `gorm:"column:port;not null" json:"port"`
 	CreatedAt  time.Time `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt  time.Time `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	Online     bool      `gorm:"column:online;not null;comment:是否在线" json:"online"` // 是否在线
 }
 
 // TableName Dingospeed's table name

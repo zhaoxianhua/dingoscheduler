@@ -21,6 +21,7 @@ import (
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
 	"dingoscheduler/internal/model/dto"
+	"dingoscheduler/pkg/util"
 
 	"gorm.io/gorm"
 )
@@ -43,11 +44,13 @@ func (d *ModelFileProcessDao) Save(process *model.ModelFileProcess) error {
 }
 
 func (d *ModelFileProcessDao) Update(process *model.ModelFileProcess, startPos int64) error {
-	db := d.baseData.BizDB.Model(&model.ModelFileProcess{})
+	var offsetSql string
 	if startPos != 0 {
-		db.Where("offset = ?", startPos)
+		offsetSql = fmt.Sprintf(" and offset_num >= %d", startPos)
 	}
-	if err := db.Where("id=?", process.ID).Updates(process).Error; err != nil {
+	sql := fmt.Sprintf("UPDATE model_file_process SET offset_num = %d, status = %d, updated_at = '%s' WHERE id = %d %s",
+		process.OffsetNum, process.Status, util.GetCurrentTimeStr(), process.ID, offsetSql)
+	if err := d.baseData.BizDB.Exec(sql).Error; err != nil {
 		return err
 	}
 	return nil
@@ -55,9 +58,9 @@ func (d *ModelFileProcessDao) Update(process *model.ModelFileProcess, startPos i
 
 func (d *ModelFileProcessDao) GetModelFileProcess(recordId int64) ([]*dto.ModelFileProcessDto, error) {
 	var processes []*dto.ModelFileProcessDto
-	if err := d.baseData.BizDB.Model(&model.ModelFileProcess{}).Select("model_file_process.*, t2.host, t2.port").
-		Joins("left join dingospeed t2 on model_file_process.instance_id = t2.instance_id").
-		Where("record_id=?", recordId).Order("offset desc").Find(&processes).Error; err != nil {
+	if err := d.baseData.BizDB.Table("model_file_process t1").Select("t1.id, t1.record_id, t1.instance_id, t1.offset_num, t2.host, t2.port, t2.updated_at").
+		Joins("left join dingospeed t2 on t1.instance_id = t2.instance_id and t2.online = true").
+		Where("record_id=?", recordId).Order("t1.offset_num desc").Find(&processes).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}

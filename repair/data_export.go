@@ -43,11 +43,11 @@ var (
 
 func init() {
 	// 解析命令行参数
-	flag.StringVar(&configPath, "config", "../config/config.yaml", "配置文件路径")
+	flag.StringVar(&configPath, "config", "./config/config.yaml", "配置文件路径")
 	flag.StringVar(&repoPathParam, "repoPath", "/Users/shijie/yonyou/dingospeed/repos", "仓库路径")
-	flag.StringVar(&instanceID, "instanceId", "mas-online", "实例ID（必填）")
+	flag.StringVar(&instanceID, "instanceId", "mas", "实例ID（必填）")
 	flag.StringVar(&apiBaseURL, "apiBase", "http://127.0.0.:8091", "获取offset的API基础地址")
-	flag.Int64Var(&minFileSize, "minSize", 1, "最小文件大小阈值，单位为MB，小于此值的文件不录入数据库")
+	flag.Int64Var(&minFileSize, "minSize", 0, "最小文件大小阈值，单位为MB，小于此值的文件不录入数据库")
 	flag.Parse()
 
 	// 校验必填参数
@@ -56,8 +56,8 @@ func init() {
 	}
 
 	// 单位转换：MB -> 字节
-	minFileSize *= 024 * 024
-	zap.S().Infof("文件大小过滤阈值设置为: %d MB (%d 字节)", minFileSize/(024*024), minFileSize)
+	minFileSize *= 1024 * 1024
+	zap.S().Infof("文件大小过滤阈值设置为: %d MB (%d 字节)", minFileSize/(1024*1024), minFileSize)
 }
 
 func main() {
@@ -230,7 +230,7 @@ func main() {
 		processRecords = append(processRecords, model.ModelFileProcess{
 			RecordID:   recordID,
 			InstanceID: instanceID,
-			Offset:     offset,
+			OffsetNum:  offset,
 			Status:     3, // 固定状态：下载完成
 		})
 	}

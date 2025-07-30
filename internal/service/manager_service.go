@@ -32,6 +32,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+var heartGap = 5 * time.Minute
+
 type ManagerService struct {
 	pb.UnimplementedManagerServer
 	clients             sync.Map // 使用 sync.Map 存储客户端信息
@@ -53,15 +55,16 @@ func (s *ManagerService) Register(ctx context.Context, req *pb.RegisterRequest) 
 		InstanceID: req.InstanceId,
 		Host:       req.Host,
 		Port:       req.Port,
+		Online:     req.Online,
 	}
-	speed, err := s.dingospeedDao.GetEntity(req.InstanceId)
+	speed, err := s.dingospeedDao.GetEntity(req.InstanceId, req.Online)
 	if err != nil {
 		zap.S().Errorf("getEntity err.%v", err)
 		return nil, err
 	}
 	if speed != nil {
 		dingospeed.ID = speed.ID
-		err = s.dingospeedDao.Update(&dingospeed)
+		err = s.dingospeedDao.RegisterUpdate(&dingospeed)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +82,7 @@ func (s *ManagerService) Register(ctx context.Context, req *pb.RegisterRequest) 
 
 func (s *ManagerService) Heartbeat(ctx context.Context, req *pb.HeartbeatRequest) (*emptypb.Empty, error) {
 	if req.Id > 0 {
-		err := s.dingospeedDao.UpdateForMap(req.Id, map[string]interface{}{"updated_at": time.Now()})
+		err := s.dingospeedDao.HeartbeatUpdate(req.Id)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +117,8 @@ func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFil
 			for _, item := range processDtos {
 				// 标记要同步的process
 				tmp := item
-				if masterProcess == nil && item.InstanceID != req.InstanceId && item.Offset > req.StartPos {
+				if masterProcess == nil && item.InstanceID != req.InstanceId &&
+					item.OffsetNum > req.StartPos && time.Now().Sub(item.UpdatedAt) <= heartGap {
 					masterProcess = tmp
 				}
 				processHistory[item.InstanceID] = tmp
@@ -124,7 +128,7 @@ func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFil
 				resp.MasterInstanceId = masterProcess.InstanceID
 				resp.Host = masterProcess.Host
 				resp.Port = masterProcess.Port
-				resp.MaxOffset = masterProcess.Offset
+				resp.MaxOffset = masterProcess.OffsetNum
 				process.MasterInstanceID = masterProcess.InstanceID
 			} else {
 				resp.SchedulerType = consts.SchedulerNo
@@ -134,6 +138,9 @@ func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFil
 				resp.ProcessId = processDto.ID
 				process.ID = processDto.ID
 				process.RecordID = processDto.RecordID
+				if processDto.OffsetNum > req.StartPos {
+					process.OffsetNum = req.StartPos
+				}
 				// 本地缓存被清空，数据库process将重新下载
 				if err = s.modelFileProcessDao.Update(process, 0); err != nil {
 					return nil, err
@@ -149,7 +156,7 @@ func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFil
 			}
 		} else {
 			process.RecordID = record.ID
-			process.Offset = 0
+			process.OffsetNum = 0
 			if err = s.modelFileProcessDao.Save(process); err != nil {
 				return nil, err
 			}
@@ -160,20 +167,7 @@ func (s *ManagerService) SchedulerFile(ctx context.Context, req *pb.SchedulerFil
 		}
 		return resp, nil
 	} else {
-		record = &model.ModelFileRecord{
-			Datatype: req.DataType,
-			Org:      req.Org,
-			Repo:     req.Repo,
-			Name:     req.Name,
-			Etag:     req.Etag,
-			FileSize: req.FileSize,
-		}
-		if err = s.modelFileRecordDao.Save(record); err != nil {
-			return nil, err
-		}
-		process.RecordID = record.ID
-		process.Offset = 0 // 初始
-		if err = s.modelFileProcessDao.Save(process); err != nil {
+		if err = s.modelFileRecordDao.SaveSchedulerRecord(req, process); err != nil {
 			return nil, err
 		}
 		return &pb.SchedulerFileResponse{
@@ -189,7 +183,7 @@ func (s *ManagerService) ReportFileProcess(ctx context.Context, req *pb.FileProc
 		Status: req.Status,
 	}
 	if req.Status != consts.StatusDownloadBreak {
-		process.Offset = req.EndPos
+		process.OffsetNum = req.EndPos
 	}
 	if err := s.modelFileProcessDao.Update(process, req.StaPos); err != nil {
 		return nil, err

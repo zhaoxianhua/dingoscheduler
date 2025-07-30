@@ -5,6 +5,10 @@ server:
     pprof: true
     pprofPort: 7060
     metrics: true
+    ssl:
+        keyFile: config/ssl/server.key
+        crtFile: config/ssl/server.crt
+        caFile: config/ssl/ca.crt
 
 #bizDB:
 #    type: "mysql"
@@ -21,9 +25,9 @@ bizDB:
     type: "mysql"
     host: "172.30.14.123"
     port: 3307
-    user: "root"
-    password: "123123"
-    database: "dingo"
+    user: root
+    password: 123123
+    database: dingo
     timeout: "10s"
     maxConn: 100
     maxIdleConn: 10
