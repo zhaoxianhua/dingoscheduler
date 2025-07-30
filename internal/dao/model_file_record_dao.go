@@ -16,7 +16,7 @@ package dao
 
 import (
 	pb "dingoscheduler/pkg/proto/manager"
-	"errors"
+
 	"go.uber.org/zap"
 
 	"dingoscheduler/internal/data"
@@ -51,7 +51,7 @@ func (d *ModelFileRecordDao) BatchSave(records []model.ModelFileRecord) error {
 }
 
 func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecordQuery) (*model.ModelFileRecord, error) {
-	record := model.ModelFileRecord{}
+	var records []*model.ModelFileRecord
 	db := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Select("id")
 	if condition.Datatype != "" {
 		db.Where("datatype = ?", condition.Datatype)
@@ -65,13 +65,14 @@ func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecord
 	if condition.Etag != "" {
 		db.Where("etag = ?", condition.Etag)
 	}
-	if err := db.First(&record).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
+	if err := db.Find(&records).Error; err != nil {
 		return nil, err
 	}
-	return &record, nil
+
+	if len(records) > 0 {
+		return records[0], nil
+	}
+	return nil, nil
 }
 
 func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, process *model.ModelFileProcess) error {
@@ -88,7 +89,7 @@ func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, p
 			return err
 		}
 		process.RecordID = record.ID
-		process.Offset = 0 // 初始
+		process.OffsetNum = 0 // 初始
 		if err := tx.Create(process).Error; err != nil {
 			return err
 		}
