@@ -1,7 +1,7 @@
 server:
     mode: debug
     host: 0.0.0.0
-    port: 9090
+    port: 9091
     pprof: true
     pprofPort: 7060
     metrics: true
@@ -33,7 +33,7 @@ bizDB:
     maxIdleConn: 10
 
 scheduler:
-    port: 9091
+    port: 19091
 
 retry:
     delay: 1       #重试间隔时间，单位秒，默认为1

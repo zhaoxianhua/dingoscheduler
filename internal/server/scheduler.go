@@ -30,6 +30,7 @@ func NewSchedulerServer(managerService *service.ManagerService) *SchedulerServer
 }
 
 func (s *SchedulerServer) Start(ctx context.Context) error {
+	zap.S().Infof("[GRPC] server start...")
 	opts := []grpc.ServerOption{}
 	ssl := config.SysConfig.Server.Ssl
 	if ssl.EnableCA {
@@ -82,6 +83,8 @@ func credential(crtFile, keyFile, caFile string) credentials.TransportCredential
 
 func (s *SchedulerServer) Stop(ctx context.Context) error {
 	zap.S().Infof("[GRPC] server shutdown.")
-	s.grpcServer.Stop()
+	if s.grpcServer != nil {
+		s.grpcServer.Stop()
+	}
 	return nil
 }
