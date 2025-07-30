@@ -55,8 +55,9 @@ func (s *ManagerService) Register(ctx context.Context, req *pb.RegisterRequest) 
 		InstanceID: req.InstanceId,
 		Host:       req.Host,
 		Port:       req.Port,
+		Online:     req.Online,
 	}
-	speed, err := s.dingospeedDao.GetEntity(req.InstanceId)
+	speed, err := s.dingospeedDao.GetEntity(req.InstanceId, req.Online)
 	if err != nil {
 		zap.S().Errorf("getEntity err.%v", err)
 		return nil, err

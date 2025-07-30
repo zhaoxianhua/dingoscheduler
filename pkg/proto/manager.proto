@@ -24,6 +24,7 @@ message RegisterRequest {
     string instanceId = 1;
     string host = 2;
     int32 port = 3;
+    bool  online = 4;
 }
 
 // 注册响应
@@ -47,6 +48,7 @@ message SchedulerFileRequest {
     int64 startPos = 7;
     int64 endPos = 8;
     int64 fileSize = 9;
+    bool  online = 10;
 }
 
 // 注册响应

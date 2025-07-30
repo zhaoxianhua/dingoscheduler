@@ -62,9 +62,9 @@ func (d *DingospeedDao) GetEntityById(id int32) (*model.Dingospeed, error) {
 	return &speed, nil
 }
 
-func (d *DingospeedDao) GetEntity(instanceId string) (*model.Dingospeed, error) {
+func (d *DingospeedDao) GetEntity(instanceId string, online bool) (*model.Dingospeed, error) {
 	var speed model.Dingospeed
-	if err := d.baseData.BizDB.Model(&model.Dingospeed{}).Where("instance_id = ?", instanceId).First(&speed).Error; err != nil {
+	if err := d.baseData.BizDB.Model(&model.Dingospeed{}).Where("instance_id = ? and online = ?", instanceId, online).First(&speed).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
