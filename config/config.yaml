@@ -6,13 +6,24 @@ server:
     pprofPort: 7060
     metrics: true
 
+#bizDB:
+#    type: "mysql"
+#    host: "172.30.14.123"
+#    port: 3306
+#    user: "dingo"
+#    password: "6XY3i+*hW4^5K7a2d@"
+#    database: "dingoscheduler"
+#    timeout: "10s"
+#    maxConn: 100
+#    maxIdleConn: 10
+
 bizDB:
     type: "mysql"
     host: "172.30.14.123"
-    port: 3306
-    user: "dingo"
-    password: "6XY3i+*hW4^5K7a2d@"
-    database: "dingoscheduler"
+    port: 3307
+    user: "root"
+    password: "123123"
+    database: "dingo"
     timeout: "10s"
     maxConn: 100
     maxIdleConn: 10

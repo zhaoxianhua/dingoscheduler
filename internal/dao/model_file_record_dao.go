@@ -16,6 +16,7 @@ package dao
 
 import (
 	"errors"
+	"fmt"
 
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
@@ -70,4 +71,50 @@ func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecord
 		return nil, err
 	}
 	return &record, nil
+}
+
+// ExistEtags 查询指定Etag列表中已存在的Etag
+func (d *ModelFileRecordDao) ExistEtags(etags []string) ([]string, error) {
+	if len(etags) == 0 {
+		return []string{}, nil
+	}
+	var existing []string
+	// 假设使用GORM，通过IN查询已存在的Etag
+	if err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).
+		Where("etag IN (?)", etags).
+		Pluck("etag", &existing).Error; err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+// GetIDsByEtags 根据Etag列表查询对应的ModelFileRecord记录的ID
+func (d *ModelFileRecordDao) GetIDsByEtags(etags []string) ([]int64, error) {
+	if len(etags) == 0 {
+		return []int64{}, nil
+	}
+
+	var ids []int64
+	// 假设使用GORM查询
+	if err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).
+		Where("etag IN (?)", etags).
+		Pluck("id", &ids).Error; err != nil {
+		return nil, fmt.Errorf("查询Etag对应的ID失败: %w", err)
+	}
+
+	return ids, nil
+}
+
+// GetByIDs 根据ID列表查询完整的ModelFileRecord记录
+func (d *ModelFileRecordDao) GetByIDs(ids []int64) ([]model.ModelFileRecord, error) {
+	if len(ids) == 0 {
+		return []model.ModelFileRecord{}, nil
+	}
+
+	var records []model.ModelFileRecord
+	if err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Where("id IN (?)", ids).Find(&records).Error; err != nil {
+		return nil, fmt.Errorf("根据ID查询ModelFileRecord失败: %w", err)
+	}
+
+	return records, nil
 }

@@ -16,6 +16,7 @@ package dao
 
 import (
 	"errors"
+	"fmt"
 
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
@@ -63,4 +64,27 @@ func (d *ModelFileProcessDao) GetModelFileProcess(recordId int64) ([]*dto.ModelF
 		return nil, err
 	}
 	return processes, nil
+}
+
+func (d *ModelFileProcessDao) BatchSave(records []model.ModelFileProcess) error {
+	if err := d.baseData.BizDB.Model(&model.ModelFileProcess{}).CreateInBatches(&records, 5).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// ExistRecordIDs 查询指定InstanceID下，哪些RecordID已存在对应的ModelFileProcess记录
+func (d *ModelFileProcessDao) ExistRecordIDs(instanceID string, recordIDs []int64) ([]int64, error) {
+	if len(recordIDs) == 0 {
+		return []int64{}, nil
+	}
+
+	var existingRecordIDs []int64
+	if err := d.baseData.BizDB.Model(&model.ModelFileProcess{}).
+		Where("instance_id = ? AND record_id IN (?)", instanceID, recordIDs).
+		Pluck("record_id", &existingRecordIDs).Error; err != nil {
+		return nil, fmt.Errorf("查询已存在的ModelFileProcess记录失败: %w", err)
+	}
+
+	return existingRecordIDs, nil
 }
