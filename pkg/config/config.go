@@ -32,9 +32,10 @@ var SystemInfo *model.SystemInfo
 type Config struct {
 	Server      ServerConfig `json:"server" yaml:"server"`
 	BizDBConfig DBConfig     `json:"bizDB" yaml:"bizDB"`
-	Log         LogConfig    `json:"log" yaml:"log"`
-	Retry       Retry        `json:"retry" yaml:"retry"`
 	Scheduler   Scheduler    `json:"scheduler" yaml:"scheduler"`
+	Retry       Retry        `json:"retry" yaml:"retry"`
+	Log         LogConfig    `json:"log" yaml:"log"`
+	Avatar      Avatar       `json:"avatar" yaml:"avatar"`
 }
 
 type ServerConfig struct {
@@ -44,6 +45,14 @@ type ServerConfig struct {
 	PProf     bool   `json:"pprof" yaml:"pprof"`
 	PProfPort int    `json:"pprofPort" yaml:"pprofPort"`
 	Metrics   bool   `json:"metrics" yaml:"metrics"`
+	Ssl       SSL    `json:"ssl" yaml:"ssl"`
+}
+
+type SSL struct {
+	EnableCA bool   `yaml:"enableCA"`
+	CrtFile  string `json:"crtFile" yaml:"crtFile" `
+	KeyFile  string `json:"keyFile" yaml:"keyFile" `
+	CaFile   string `json:"caFile" yaml:"caFile" `
 }
 
 type Retry struct {
@@ -55,6 +64,10 @@ type LogConfig struct {
 	MaxSize    int `json:"maxSize" yaml:"maxSize"`
 	MaxBackups int `json:"maxBackups" yaml:"maxBackups"`
 	MaxAge     int `json:"maxAge" yaml:"maxAge"`
+}
+
+type Avatar struct {
+	Path string `yaml:"path"`
 }
 
 type Scheduler struct {
@@ -91,6 +104,7 @@ func (c *Config) SetDefaults() {
 	if c.Server.PProfPort == 0 {
 		c.Server.PProfPort = 6060
 	}
+	c.Server.Ssl.EnableCA = true
 }
 
 func Scan(path string) (*Config, error) {
