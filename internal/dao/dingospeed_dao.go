@@ -64,7 +64,7 @@ func (d *DingospeedDao) GetEntityById(id int32) (*model.Dingospeed, error) {
 }
 
 func (d *DingospeedDao) GetEntity(instanceId string, online bool) (*model.Dingospeed, error) {
-	var speeds []*model.Dingospeed
+	speeds := make([]model.Dingospeed, 0)
 	// sql := fmt.Sprintf("select * from dingospeed where instance_id = '%s' and online = %v limit 1", instanceId, online)
 	// if err := d.baseData.BizDB.Raw(sql).Scan(&speed).Error; err != nil { // [mysql] 2025/07/30 11:18:38 packets.go:68 [warn] unexpected sequence nr: expected 1, got 2
 	// 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -86,7 +86,7 @@ func (d *DingospeedDao) GetEntity(instanceId string, online bool) (*model.Dingos
 		return nil, err
 	}
 	if len(speeds) > 0 {
-		return speeds[0], nil
+		return &speeds[0], nil
 	}
 	return nil, nil
 }

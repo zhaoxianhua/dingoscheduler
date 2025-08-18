@@ -55,17 +55,12 @@ func (d *ModelFileProcessDao) ResetProcess(process *model.ModelFileProcess) erro
 }
 
 func (d *ModelFileProcessDao) ReportFileProcess(req *pb.FileProcessRequest) error {
-	process := &model.ModelFileProcess{
-		ID:        req.ProcessId,
-		Status:    req.Status,
-		OffsetNum: req.EndPos,
-	}
 	var sql string
-	if process.Status == consts.StatusDownloadBreak {
-		sql = fmt.Sprintf("UPDATE model_file_process SET status = %d, updated_at = '%s' WHERE id = %d", process.Status, util.GetCurrentTimeStr(), process.ID)
+	if req.Status == consts.StatusDownloadBreak {
+		sql = fmt.Sprintf("UPDATE model_file_process SET status = %d, updated_at = '%s' WHERE id = %d", req.Status, util.GetCurrentTimeStr(), req.ProcessId)
 	} else {
-		sql = fmt.Sprintf("UPDATE model_file_process SET offset_num = %d, status = %d, updated_at = '%s' WHERE id = %d and offset_num >= %d",
-			process.OffsetNum, process.Status, util.GetCurrentTimeStr(), process.ID, req.StaPos)
+		sql = fmt.Sprintf("UPDATE model_file_process SET offset_num = %d, status = %d, updated_at = '%s' WHERE id = %d and offset_num <= %d",
+			req.EndPos, req.Status, util.GetCurrentTimeStr(), req.ProcessId, req.StaPos)
 	}
 	if err := d.baseData.BizDB.Exec(sql).Error; err != nil {
 		return err
