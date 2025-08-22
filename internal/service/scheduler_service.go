@@ -123,7 +123,9 @@ func (s *SchedulerService) SchedulerFile(ctx context.Context, req *pb.SchedulerF
 					item.OffsetNum > req.StartPos && time.Now().Sub(item.UpdatedAt) <= heartGap {
 					masterProcess = tmp
 				}
-				processHistory[item.InstanceID] = tmp
+				if _, ok := processHistory[item.InstanceID]; !ok {
+					processHistory[item.InstanceID] = tmp
+				}
 			}
 			if masterProcess != nil {
 				resp.SchedulerType = consts.SchedulerYes
@@ -180,6 +182,44 @@ func (s *SchedulerService) SchedulerFile(ctx context.Context, req *pb.SchedulerF
 			ProcessId:     process.ID,
 		}, nil
 	}
+}
+
+func (s *SchedulerService) SyncFileProcess(ctx context.Context, req *pb.SchedulerFileRequest) (*emptypb.Empty, error) {
+	record, err := s.modelFileRecordDao.GetModelFileRecord(&query.ModelFileRecordQuery{
+		Datatype: req.DataType,
+		Org:      req.Org,
+		Repo:     req.Repo,
+		Etag:     req.Etag,
+	})
+	if err != nil {
+		return nil, err
+	}
+	process := &model.ModelFileProcess{
+		InstanceID: req.InstanceId,
+	}
+	if record != nil {
+		processDto, err := s.modelFileProcessDao.GetModelFileProcessByInstanceId(record.ID, req.InstanceId)
+		if err != nil {
+			return nil, err
+		}
+		if processDto != nil {
+
+		} else {
+			process.RecordID = record.ID
+			process.OffsetNum = req.EndPos
+			process.Status = 3 // download complete
+			if err = s.modelFileProcessDao.Save(process); err != nil {
+				return nil, err
+			}
+		}
+		return nil, nil
+	} else {
+		if err = s.modelFileRecordDao.SaveSchedulerRecord(req, process); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+	return nil, nil
 }
 
 func (s *SchedulerService) ReportFileProcess(ctx context.Context, req *pb.FileProcessRequest) (*emptypb.Empty, error) {

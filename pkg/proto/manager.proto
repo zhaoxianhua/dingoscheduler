@@ -13,6 +13,10 @@ service Manager {
     rpc Heartbeat (HeartbeatRequest) returns (google.protobuf.Empty);
     // 下载文件开始时，触发调度
     rpc SchedulerFile (SchedulerFileRequest) returns (SchedulerFileResponse);
+
+    // 下载文件开始时，触发调度
+    rpc SyncFileProcess (SchedulerFileRequest) returns (google.protobuf.Empty);
+
     // 文件下载结束，信息上报
     rpc ReportFileProcess (FileProcessRequest) returns (google.protobuf.Empty);
 
@@ -48,7 +52,6 @@ message SchedulerFileRequest {
     int64 startPos = 7;
     int64 endPos = 8;
     int64 fileSize = 9;
-    bool  online = 10;
 }
 
 // 注册响应
