@@ -69,7 +69,7 @@ func (s *PreheatJobService) Preheat(c echo.Context, job *query.PreheatJobQuery) 
 	}
 	speedDomain := fmt.Sprintf("http://%s:%d", entity.Host, entity.Port)
 	orgRepo := util.GetOrgRepo(job.Org, job.Repo)
-	resp, err := s.preheatJobDao.RemoteRequestMeta(speedDomain, job.Datatype, orgRepo, "main", job.Token)
+	resp, err := s.dingospeedDao.RemoteRequestMeta(speedDomain, job.Datatype, orgRepo, "main", job.Token)
 	if err != nil {
 		return err
 	}

@@ -49,4 +49,6 @@ func (r *HttpRouter) initRouter() {
 		r.echo.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 	}
 	r.echo.POST("/api/preheat", r.managerHandler.PreheatHandler)
+	r.echo.POST("/api/persistRepo", r.managerHandler.PersistRepoHandler)
+
 }

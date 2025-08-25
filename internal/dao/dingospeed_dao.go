@@ -19,6 +19,7 @@ import (
 
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
+	"dingoscheduler/pkg/common"
 	"dingoscheduler/pkg/util"
 )
 
@@ -89,4 +90,20 @@ func (d *DingospeedDao) GetEntity(instanceId string, online bool) (*model.Dingos
 		return &speeds[0], nil
 	}
 	return nil, nil
+}
+
+func (d *DingospeedDao) RemoteRequestMeta(domain, repoType, orgRepo, commit, authorization string) (*common.Response, error) {
+	var reqUri string
+	if commit == "" {
+		reqUri = fmt.Sprintf("/api/%s/%s", repoType, orgRepo)
+	} else {
+		reqUri = fmt.Sprintf("/api/%s/%s/revision/%s", repoType, orgRepo, commit)
+	}
+	headers := map[string]string{}
+	if authorization != "" {
+		headers["authorization"] = fmt.Sprintf("Bearer %s", authorization)
+	}
+	return util.RetryRequest(func() (*common.Response, error) {
+		return util.GetForDomain(domain, reqUri, headers)
+	})
 }

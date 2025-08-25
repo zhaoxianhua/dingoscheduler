@@ -15,8 +15,9 @@
 package dao
 
 import (
-	pb "dingoscheduler/pkg/proto/manager"
 	"fmt"
+
+	pb "dingoscheduler/pkg/proto/manager"
 
 	"go.uber.org/zap"
 

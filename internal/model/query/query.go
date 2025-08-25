@@ -25,3 +25,8 @@ type PathInfoQuery struct {
 	Token     string   `json:"token"`
 	FileNames []string `json:"fileNames"`
 }
+
+type PersistRepoQuery struct {
+	Area  []string `json:"area"`
+	Token string   `json:"token"`
+}

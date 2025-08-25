@@ -16,12 +16,14 @@ import (
 type ManagerHandler struct {
 	schedulerService  *service.SchedulerService
 	preheatJobService *service.PreheatJobService
+	repositoryService *service.RepositoryService
 }
 
-func NewManagerHandler(schedulerService *service.SchedulerService, preheatJobService *service.PreheatJobService) *ManagerHandler {
+func NewManagerHandler(schedulerService *service.SchedulerService, preheatJobService *service.PreheatJobService, repositoryService *service.RepositoryService) *ManagerHandler {
 	return &ManagerHandler{
 		schedulerService:  schedulerService,
 		preheatJobService: preheatJobService,
+		repositoryService: repositoryService,
 	}
 }
 
@@ -41,6 +43,23 @@ func (handler *ManagerHandler) PreheatHandler(c echo.Context) error {
 		return util.ErrorRepoNotFound(c)
 	}
 	err := handler.preheatJobService.Preheat(c, job)
+	if err != nil {
+		if e, ok := err.(myerr.Error); ok {
+			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
+		}
+		return util.ErrorProxyError(c)
+	}
+	return util.ResponseData(c, nil)
+}
+
+func (handler *ManagerHandler) PersistRepoHandler(c echo.Context) error {
+	job := new(query.PersistRepoQuery)
+	if err := c.Bind(job); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{
+			"error": "无效的 JSON 数据",
+		})
+	}
+	err := handler.repositoryService.PersistRepo(c, job)
 	if err != nil {
 		if e, ok := err.(myerr.Error); ok {
 			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())

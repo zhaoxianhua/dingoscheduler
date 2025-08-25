@@ -68,22 +68,6 @@ func (d *PreheatJobDao) GetPreheatJob(condition *query.PreheatJobQuery) (*model.
 	return nil, nil
 }
 
-func (d *PreheatJobDao) RemoteRequestMeta(domain, repoType, orgRepo, commit, authorization string) (*common.Response, error) {
-	var reqUri string
-	if commit == "" {
-		reqUri = fmt.Sprintf("/api/%s/%s", repoType, orgRepo)
-	} else {
-		reqUri = fmt.Sprintf("/api/%s/%s/revision/%s", repoType, orgRepo, commit)
-	}
-	headers := map[string]string{}
-	if authorization != "" {
-		headers["authorization"] = fmt.Sprintf("Bearer %s", authorization)
-	}
-	return util.RetryRequest(func() (*common.Response, error) {
-		return util.GetForDomain(domain, reqUri, headers)
-	})
-}
-
 func (d *PreheatJobDao) RemoteRequestPathsInfo(domain, dataType, org, repo, revision, token string, fileNames []string) ([]common.PathsInfo, error) {
 	var reqUri = "/api/getPathInfo"
 	headers := map[string]string{}
