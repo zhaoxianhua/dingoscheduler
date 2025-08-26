@@ -15,9 +15,10 @@
 package dao
 
 import (
+	"fmt"
+
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
-	"fmt"
 )
 
 type ModelFileRecordDao struct {
@@ -88,4 +89,10 @@ func (d *ModelFileRecordDao) GetByIDs(ids []int64) ([]model.ModelFileRecord, err
 	}
 
 	return records, nil
+}
+
+func (d *ModelFileRecordDao) FindDistinctRepos() ([]string, error) {
+	var orgs []string
+	err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Distinct("org").Find(&orgs).Error
+	return orgs, err
 }
