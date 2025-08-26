@@ -35,6 +35,7 @@ type Config struct {
 	Scheduler   Scheduler    `json:"scheduler" yaml:"scheduler"`
 	Retry       Retry        `json:"retry" yaml:"retry"`
 	Log         LogConfig    `json:"log" yaml:"log"`
+	Avatar      Avatar       `json:"avatar" yaml:"avatar"`
 }
 
 type ServerConfig struct {
@@ -63,6 +64,10 @@ type LogConfig struct {
 	MaxSize    int `json:"maxSize" yaml:"maxSize"`
 	MaxBackups int `json:"maxBackups" yaml:"maxBackups"`
 	MaxAge     int `json:"maxAge" yaml:"maxAge"`
+}
+
+type Avatar struct {
+	Path string `yaml:"path"`
 }
 
 type Scheduler struct {

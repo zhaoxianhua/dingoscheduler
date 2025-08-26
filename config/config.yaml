@@ -43,3 +43,6 @@ log:
     maxSize: 20      # 日志文件最大的尺寸（MB）
     maxBackups: 10  #保留旧文件的最大个数
     maxAge: 90      #保留旧文件的最大天数
+
+avatar:
+    path: ./avatar
