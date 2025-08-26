@@ -15,14 +15,9 @@
 package dao
 
 import (
-	"fmt"
-
-	pb "dingoscheduler/pkg/proto/manager"
-
-	"go.uber.org/zap"
-
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
+	"fmt"
 )
 
 type ModelFileRecordDao struct {
