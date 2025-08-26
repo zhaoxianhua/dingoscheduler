@@ -66,16 +66,13 @@ func (handler *AlayanewHandler) ModelsHandler(c echo.Context) error {
 }
 
 func (handler *AlayanewHandler) ModelInfoHandler(c echo.Context) error {
-	id := c.Param("id")
-	models, total, err := handler.repositoryService.GetById(id)
+	id := util.Atoi64(c.Param("id"))
+	models, err := handler.repositoryService.GetById(id)
 	if err != nil {
 		if e, ok := err.(myerr.Error); ok {
 			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
 		}
 		return util.ErrorProxyError(c)
 	}
-	return util.ResponseData(c, util.PageData{
-		Total: total,
-		List:  models,
-	})
+	return util.ResponseData(c, models)
 }
