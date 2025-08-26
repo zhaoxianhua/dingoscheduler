@@ -127,5 +127,6 @@ func (s *RepositoryService) GetById(id int64) (*dto.Repository, error) {
 	var repos dto.Repository
 	gocopy.Copy(&repos, &repository)
 
-	return repos, nil
+	// return repos, nil
+	return nil, nil
 }
