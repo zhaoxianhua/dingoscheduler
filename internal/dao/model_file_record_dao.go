@@ -15,16 +15,10 @@
 package dao
 
 import (
-	pb "dingoscheduler/pkg/proto/manager"
 	"fmt"
-
-	"go.uber.org/zap"
 
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
-	"dingoscheduler/internal/model/query"
-
-	"gorm.io/gorm"
 )
 
 type ModelFileRecordDao struct {
@@ -46,57 +40,6 @@ func (d *ModelFileRecordDao) Save(records *model.ModelFileRecord) error {
 
 func (d *ModelFileRecordDao) BatchSave(records []model.ModelFileRecord) error {
 	if err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).CreateInBatches(&records, 5).Error; err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecordQuery) (*model.ModelFileRecord, error) {
-	var records []*model.ModelFileRecord
-	db := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Select("id")
-	if condition.Datatype != "" {
-		db.Where("datatype = ?", condition.Datatype)
-	}
-	if condition.Org != "" {
-		db.Where("org = ?", condition.Org)
-	}
-	if condition.Repo != "" {
-		db.Where("repo = ?", condition.Repo)
-	}
-	if condition.Etag != "" {
-		db.Where("etag = ?", condition.Etag)
-	}
-	if err := db.Find(&records).Error; err != nil {
-		return nil, err
-	}
-
-	if len(records) > 0 {
-		return records[0], nil
-	}
-	return nil, nil
-}
-
-func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, process *model.ModelFileProcess) error {
-	if err := d.baseData.BizDB.Transaction(func(tx *gorm.DB) error {
-		record := &model.ModelFileRecord{
-			Datatype: req.DataType,
-			Org:      req.Org,
-			Repo:     req.Repo,
-			Name:     req.Name,
-			Etag:     req.Etag,
-			FileSize: req.FileSize,
-		}
-		if err := tx.Create(record).Error; err != nil {
-			return err
-		}
-		process.RecordID = record.ID
-		process.OffsetNum = 0 // 初始
-		if err := tx.Create(process).Error; err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		zap.S().Error("SaveSchedulerRecord err.%v", err)
 		return err
 	}
 	return nil
@@ -146,10 +89,4 @@ func (d *ModelFileRecordDao) GetByIDs(ids []int64) ([]model.ModelFileRecord, err
 	}
 
 	return records, nil
-}
-
-func (d *ModelFileRecordDao) FindDistinctRepos() ([]string, error) {
-	var orgs []string
-	err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Distinct("org").Find(&orgs).Error
-	return orgs, err
 }
