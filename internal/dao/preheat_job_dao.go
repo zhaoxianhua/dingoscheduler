@@ -46,8 +46,8 @@ func (d *PreheatJobDao) Save(preheatJob *model.PreheatJob) error {
 func (d *PreheatJobDao) GetPreheatJob(condition *query.PreheatJobQuery) (*model.PreheatJob, error) {
 	var preheatJobs []*model.PreheatJob
 	db := d.baseData.BizDB.Model(&model.PreheatJob{}).Select("id")
-	if condition.Area != "" {
-		db.Where("area = ?", condition.Area)
+	if condition.InstanceId != "" {
+		db.Where("instance_id = ?", condition.InstanceId)
 	}
 	if condition.Datatype != "" {
 		db.Where("datatype = ?", condition.Datatype)

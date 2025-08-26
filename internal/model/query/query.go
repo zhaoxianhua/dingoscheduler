@@ -10,11 +10,11 @@ type ModelFileRecordQuery struct {
 }
 
 type PreheatJobQuery struct {
-	Area     string `json:"area"`
-	Datatype string `json:"datatype"`
-	Org      string `json:"org"`
-	Repo     string `json:"repo"`
-	Token    string `json:"token"`
+	InstanceId string `json:"instanceId"`
+	Datatype   string `json:"datatype"`
+	Org        string `json:"org"`
+	Repo       string `json:"repo"`
+	Token      string `json:"token"`
 }
 
 type PathInfoQuery struct {
@@ -27,6 +27,15 @@ type PathInfoQuery struct {
 }
 
 type PersistRepoQuery struct {
-	Area  []string `json:"area"`
-	Token string   `json:"token"`
+	InstanceIds []string `json:"instanceIds"`
+	Token       string   `json:"token"`
+}
+
+type ModelQuery struct {
+	InstanceId string `json:"instanceId"`
+	Name       string
+	Page       int
+	PageSize   int
+	Sort       string
+	Order      string
 }

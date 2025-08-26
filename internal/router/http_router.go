@@ -23,16 +23,18 @@ import (
 )
 
 type HttpRouter struct {
-	echo           *echo.Echo
-	sysHandler     *handler.SysHandler
-	managerHandler *handler.ManagerHandler
+	echo            *echo.Echo
+	sysHandler      *handler.SysHandler
+	managerHandler  *handler.ManagerHandler
+	alayanewHandler *handler.AlayanewHandler
 }
 
-func NewHttpRouter(echo *echo.Echo, managerHandler *handler.ManagerHandler, sysHandler *handler.SysHandler) *HttpRouter {
+func NewHttpRouter(echo *echo.Echo, managerHandler *handler.ManagerHandler, sysHandler *handler.SysHandler, alayanewHandler *handler.AlayanewHandler) *HttpRouter {
 	r := &HttpRouter{
-		echo:           echo,
-		sysHandler:     sysHandler,
-		managerHandler: managerHandler,
+		echo:            echo,
+		sysHandler:      sysHandler,
+		managerHandler:  managerHandler,
+		alayanewHandler: alayanewHandler,
 	}
 	r.initRouter()
 	return r
@@ -50,5 +52,8 @@ func (r *HttpRouter) initRouter() {
 	}
 	r.echo.POST("/api/preheat", r.managerHandler.PreheatHandler)
 	r.echo.POST("/api/persistRepo", r.managerHandler.PersistRepoHandler)
+
+	r.echo.GET("/api/v1/models", r.alayanewHandler.ModelsHandler)
+	r.echo.GET("/api/v1/model/:id", r.alayanewHandler.ModelInfoHandler)
 
 }

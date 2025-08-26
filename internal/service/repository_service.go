@@ -19,6 +19,7 @@ import (
 	"net/http"
 
 	"dingoscheduler/internal/dao"
+	"dingoscheduler/internal/model"
 	"dingoscheduler/internal/model/dto"
 	"dingoscheduler/internal/model/query"
 	"dingoscheduler/pkg/common"
@@ -27,6 +28,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/labstack/echo/v4"
+	"github.com/young2j/gocopy"
 	"go.uber.org/zap"
 )
 
@@ -48,17 +50,17 @@ func NewRepositoryService(dingospeedDao *dao.DingospeedDao, modelFileProcessDao 
 }
 
 func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepoQuery) error {
-	zap.S().Debugf("Preheat:%s, %s/%s/%s/%s", query.Area)
-	freeRepositories, err := s.repositoryDao.GetFreeRepository()
-	if err != nil {
-		return err
-	}
-	if len(freeRepositories) == 0 {
-		return nil
-	}
-	for _, area := range query.Area {
+	zap.S().Debugf("PersistRepo instanceId:%s", query.InstanceIds)
+	for _, instanceId := range query.InstanceIds {
+		freeRepositories, err := s.repositoryDao.GetFreeRepository(instanceId)
+		if err != nil {
+			return err
+		}
+		if len(freeRepositories) == 0 {
+			return nil
+		}
 		for _, repository := range freeRepositories {
-			entity, err := s.dingospeedDao.GetEntity(area, true)
+			entity, err := s.dingospeedDao.GetEntity(instanceId, true)
 			if err != nil {
 				return err
 			}
@@ -74,43 +76,56 @@ func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepo
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusTemporaryRedirect {
 				return myerr.NewAppendCode(resp.StatusCode, "RemoteRequestMeta err")
 			}
-			var sha dto.CommitHfSha
-			if err = sonic.Unmarshal(resp.Body, &sha); err != nil {
+			var metaData dto.CommitHfSha
+			if err = sonic.Unmarshal(resp.Body, &metaData); err != nil {
 				zap.S().Errorf("unmarshal error.%v", err)
 				return err
 			}
-			// repo := model.Repository{
-			// 	Org:       repository.Org,
-			// 	Repo:      repository.Repo,
-			// 	OrgRepo:   orgRepo,
-			// 	LikeNum:   sha.Likes,
-			// 	FollowNum: sha.Downloads,
-			// }
+			repo := &model.Repository{
+				InstanceId:    instanceId,
+				Datatype:      repository.Datatype,
+				Org:           repository.Org,
+				Repo:          repository.Repo,
+				OrgRepo:       orgRepo,
+				LikeNum:       metaData.Likes,
+				DownloadNum:   metaData.Downloads,
+				PipelineTagId: metaData.PipelineTag,
+				LastModified:  metaData.LastModified,
+				UsedStorage:   metaData.UsedStorage,
+			}
+			tags := make([]*model.RepositoryTag, 0)
+			for _, tag := range metaData.Tags {
+				tags = append(tags, &model.RepositoryTag{
+					TagId: tag,
+				})
+			}
+			err = s.repositoryDao.RepoAndTagSave(repo, tags)
+			if err != nil {
+				zap.S().Errorf("repository save err.%v", err)
+				return err
+			}
 		}
 	}
-
-	// jobModel := model.PreheatJob{
-	// 	Area:      job.Area,
-	// 	Datatype:  job.Datatype,
-	// 	Org:       job.Org,
-	// 	Repo:      job.Repo,
-	// 	Token:     job.Token,
-	// 	Revision:  sha.Sha,
-	// 	FileTotal: len(sha.Siblings),
-	// 	MetaInfo:  string(resp.Body),
-	// 	Status:    consts.StatusPreheatCommit,
-	// }
-	// if err = s.Pool.Submit(context.Background(), &PreheatTask{
-	// 	preheatJobDao:       s.preheatJobDao,
-	// 	modelFileProcessDao: s.modelFileProcessDao,
-	// 	Job:                 &jobModel,
-	// 	Domain:              speedDomain,
-	// }); err != nil {
-	// 	return err
-	// }
-	// err = s.preheatJobDao.Save(&jobModel)
-	// if err != nil {
-	// 	return err
-	// }
 	return nil
+}
+
+func (s *RepositoryService) ModelList(query *query.ModelQuery) ([]*dto.Repository, int64, error) {
+	repositories, size, err := s.repositoryDao.ModelList(query)
+	if err != nil {
+		return nil, 0, err
+	}
+	repos := make([]*dto.Repository, 0)
+	gocopy.Copy(&repos, &repositories)
+	return repos, size, nil
+}
+
+func (s *RepositoryService) GetById(id int64) (*dto.Repository, error) {
+	repository, err := s.repositoryDao.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	var repos dto.Repository
+	gocopy.Copy(&repos, &repository)
+
+	return repos, nil
 }

@@ -152,3 +152,8 @@ func fullHeaders(c echo.Context, headers map[string]string) {
 		}
 	}
 }
+
+type PageData struct {
+	Total int64       `json:"total"`
+	List  interface{} `json:"list"`
+}
