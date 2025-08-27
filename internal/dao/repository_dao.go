@@ -43,11 +43,14 @@ func (d *RepositoryDao) Save(repository *model.Repository) error {
 }
 
 func (d *RepositoryDao) Get(id int64) (*model.Repository, error) {
-	var repository model.Repository
-	if err := d.baseData.BizDB.Model(&model.Repository{}).Where("id = ?", id).Find(&repository).Error; err != nil {
+	var repository []*model.Repository
+	if err := d.baseData.BizDB.Model(&model.Repository{}).Select("id, org_repo,like_num, download_num, pipeline_tag_id,last_modified ").Where("id = ?", id).Find(&repository).Error; err != nil {
 		return nil, err
 	}
-	return &repository, nil
+	if len(repository) > 0 {
+		return repository[0], nil
+	}
+	return nil, fmt.Errorf("No record found")
 }
 
 func (d *RepositoryDao) RepoAndTagSave(repository *model.Repository, tags []*model.RepositoryTag) error {

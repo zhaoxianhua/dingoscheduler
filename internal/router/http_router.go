@@ -53,7 +53,8 @@ func (r *HttpRouter) initRouter() {
 	r.echo.POST("/api/preheat", r.managerHandler.PreheatHandler)
 	r.echo.POST("/api/persistRepo", r.managerHandler.PersistRepoHandler)
 
-	r.echo.GET("/api/v1/models", r.alayanewHandler.ModelsHandler)
-	r.echo.GET("/api/v1/model/:id", r.alayanewHandler.ModelInfoHandler)
+	r.echo.GET("/api/v1/repositories", r.alayanewHandler.RepositoriesHandler)
+	r.echo.GET("/api/v1/repository/:id", r.alayanewHandler.RepositoryInfoHandler)
+	r.echo.GET("/api/v1/repository/card/:id", r.alayanewHandler.RepositoryCardHandler)
 
 }

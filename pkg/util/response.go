@@ -145,6 +145,13 @@ func ResponseData(ctx echo.Context, data interface{}) error {
 	})
 }
 
+func ResponseError(ctx echo.Context, err error) error {
+	return ctx.JSON(http.StatusInternalServerError, Body{
+		Code: http.StatusInternalServerError,
+		Msg:  err.Error(),
+	})
+}
+
 func fullHeaders(c echo.Context, headers map[string]string) {
 	if headers != nil {
 		for k, v := range headers {

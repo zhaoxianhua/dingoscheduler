@@ -22,7 +22,7 @@ func NewAlayanewHandler(repositoryService *service.RepositoryService) *AlayanewH
 	}
 }
 
-func (handler *AlayanewHandler) ModelsHandler(c echo.Context) error {
+func (handler *AlayanewHandler) RepositoriesHandler(c echo.Context) error {
 	name := c.QueryParam("name")
 	instanceId := c.QueryParam("instanceId")
 	page, _ := strconv.Atoi(c.QueryParam("page"))
@@ -45,7 +45,7 @@ func (handler *AlayanewHandler) ModelsHandler(c echo.Context) error {
 	if sortDir != "asc" && sortDir != "desc" {
 		return util.ErrorRequestParam(c)
 	}
-	models, total, err := handler.repositoryService.ModelList(&query.ModelQuery{
+	models, total, err := handler.repositoryService.RepositoryList(&query.ModelQuery{
 		InstanceId: instanceId,
 		Name:       name,
 		Page:       page,
@@ -57,7 +57,7 @@ func (handler *AlayanewHandler) ModelsHandler(c echo.Context) error {
 		if e, ok := err.(myerr.Error); ok {
 			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
 		}
-		return util.ErrorProxyError(c)
+		return util.ResponseError(c, err)
 	}
 	return util.ResponseData(c, util.PageData{
 		Total: total,
@@ -65,14 +65,26 @@ func (handler *AlayanewHandler) ModelsHandler(c echo.Context) error {
 	})
 }
 
-func (handler *AlayanewHandler) ModelInfoHandler(c echo.Context) error {
+func (handler *AlayanewHandler) RepositoryInfoHandler(c echo.Context) error {
 	id := util.Atoi64(c.Param("id"))
-	models, err := handler.repositoryService.GetById(id)
+	model, err := handler.repositoryService.GetRepositoryById(id)
 	if err != nil {
 		if e, ok := err.(myerr.Error); ok {
 			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
 		}
-		return util.ErrorProxyError(c)
+		return util.ResponseError(c, err)
 	}
-	return util.ResponseData(c, models)
+	return util.ResponseData(c, model)
+}
+
+func (handler *AlayanewHandler) RepositoryCardHandler(c echo.Context) error {
+	id := util.Atoi64(c.Param("id"))
+	model, err := handler.repositoryService.RepositoryCardById(id)
+	if err != nil {
+		if e, ok := err.(myerr.Error); ok {
+			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
+		}
+		return util.ResponseError(c, err)
+	}
+	return util.ResponseData(c, model)
 }
