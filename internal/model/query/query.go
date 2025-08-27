@@ -39,3 +39,8 @@ type ModelQuery struct {
 	Sort       string
 	Order      string
 }
+
+type TagQuery struct {
+	Types    []string
+	SubTypes []string
+}

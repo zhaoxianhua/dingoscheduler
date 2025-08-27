@@ -56,4 +56,5 @@ func (r *HttpRouter) initRouter() {
 	r.echo.GET("/api/v1/models", r.alayanewHandler.ModelsHandler)
 	r.echo.GET("/api/v1/model/:id", r.alayanewHandler.ModelInfoHandler)
 
+	r.echo.GET("/api/v1/tags", r.alayanewHandler.TagHandler)
 }

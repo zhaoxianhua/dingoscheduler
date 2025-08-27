@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -75,4 +76,37 @@ func (handler *AlayanewHandler) ModelInfoHandler(c echo.Context) error {
 		return util.ErrorProxyError(c)
 	}
 	return util.ResponseData(c, models)
+}
+
+func (handler *AlayanewHandler) TagHandler(c echo.Context) error {
+	tagTypesStr := c.QueryParam("type")
+	tagSubTypeStr := c.QueryParam("subType")
+
+	var tagTypes []string
+	if tagTypesStr != "" {
+		tagTypesStr = strings.TrimSpace(tagTypesStr)
+		if err := json.Unmarshal([]byte(tagTypesStr), &tagTypes); err != nil {
+			return util.ErrorEntryUnknown(c, 400, "type 参数格式错误，应为 JSON 数组字符串")
+		}
+	}
+
+	var tagSubTypes []string
+	if tagSubTypeStr != "" {
+		tagSubTypeStr = strings.TrimSpace(tagSubTypeStr)
+		if err := json.Unmarshal([]byte(tagSubTypeStr), &tagSubTypes); err != nil {
+			return util.ErrorEntryUnknown(c, 400, "subType 参数格式错误，应为 JSON 数组字符串")
+		}
+	}
+
+	tags, err := handler.tagService.TagListByCondition(&query.TagQuery{
+		Types:    tagTypes,
+		SubTypes: tagSubTypes,
+	})
+	if err != nil {
+		if e, ok := err.(myerr.Error); ok {
+			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
+		}
+		return util.ErrorProxyError(c)
+	}
+	return util.ResponseData(c, tags)
 }
