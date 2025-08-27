@@ -15,11 +15,13 @@ import (
 
 type AlayanewHandler struct {
 	repositoryService *service.RepositoryService
+	tagService        *service.TagService
 }
 
-func NewAlayanewHandler(repositoryService *service.RepositoryService) *AlayanewHandler {
+func NewAlayanewHandler(repositoryService *service.RepositoryService, tagService *service.TagService) *AlayanewHandler {
 	return &AlayanewHandler{
 		repositoryService: repositoryService,
+		tagService:        tagService,
 	}
 }
 
