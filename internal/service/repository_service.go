@@ -17,12 +17,13 @@ package service
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"dingoscheduler/internal/dao"
 	"dingoscheduler/internal/model"
 	"dingoscheduler/internal/model/dto"
 	"dingoscheduler/internal/model/query"
-	"dingoscheduler/pkg/common"
 	myerr "dingoscheduler/pkg/error"
 	"dingoscheduler/pkg/util"
 
@@ -36,22 +37,23 @@ type RepositoryService struct {
 	dingospeedDao       *dao.DingospeedDao
 	modelFileProcessDao *dao.ModelFileProcessDao
 	repositoryDao       *dao.RepositoryDao
-	Pool                *common.Pool
+	tagDao              *dao.TagDao
 }
 
 func NewRepositoryService(dingospeedDao *dao.DingospeedDao, modelFileProcessDao *dao.ModelFileProcessDao,
-	repositoryDao *dao.RepositoryDao) *RepositoryService {
+	repositoryDao *dao.RepositoryDao, tagDao *dao.TagDao) *RepositoryService {
 	return &RepositoryService{
 		dingospeedDao:       dingospeedDao,
 		repositoryDao:       repositoryDao,
 		modelFileProcessDao: modelFileProcessDao,
-		Pool:                common.NewPool(30),
+		tagDao:              tagDao,
 	}
 }
 
 func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepoQuery) error {
 	zap.S().Debugf("PersistRepo instanceId:%s", query.InstanceIds)
 	for _, instanceId := range query.InstanceIds {
+		// 存在下载记录和进度，但模型在仓库不存在。
 		freeRepositories, err := s.repositoryDao.GetFreeRepository(instanceId)
 		if err != nil {
 			return err
@@ -81,6 +83,8 @@ func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepo
 				zap.S().Errorf("unmarshal error.%v", err)
 				return err
 			}
+			// 根据当前版本的元数据与下载进度、进度比较，只将完整的模型做保存。
+			// todo
 			repo := &model.Repository{
 				InstanceId:    instanceId,
 				Datatype:      repository.Datatype,
@@ -92,6 +96,7 @@ func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepo
 				PipelineTagId: metaData.PipelineTag,
 				LastModified:  metaData.LastModified,
 				UsedStorage:   metaData.UsedStorage,
+				Sha:           metaData.Sha,
 			}
 			tags := make([]*model.RepositoryTag, 0)
 			for _, tag := range metaData.Tags {
@@ -109,7 +114,7 @@ func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepo
 	return nil
 }
 
-func (s *RepositoryService) ModelList(query *query.ModelQuery) ([]*dto.Repository, int64, error) {
+func (s *RepositoryService) RepositoryList(query *query.ModelQuery) ([]*dto.Repository, int64, error) {
 	repositories, size, err := s.repositoryDao.ModelList(query)
 	if err != nil {
 		return nil, 0, err
@@ -119,14 +124,48 @@ func (s *RepositoryService) ModelList(query *query.ModelQuery) ([]*dto.Repositor
 	return repos, size, nil
 }
 
-func (s *RepositoryService) GetById(id int64) (*dto.Repository, error) {
+func (s *RepositoryService) GetRepositoryById(id int64) (*dto.Repository, error) {
 	repository, err := s.repositoryDao.Get(id)
 	if err != nil {
 		return nil, err
 	}
-	var repos dto.Repository
-	gocopy.Copy(&repos, &repository)
+	var repo dto.Repository
+	gocopy.Copy(&repo, &repository)
+	tags, err := s.tagDao.GetTagByRepoId(id)
+	if err != nil {
+		return nil, err
+	}
+	for _, tag := range tags {
+		repo.Tags = append(repo.Tags, tag.Label)
+	}
+	return &repo, nil
+}
 
-	// return repos, nil
-	return nil, nil
+func (s *RepositoryService) RepositoryCardById(id int64) (*dto.Repository, error) {
+	repository, err := s.repositoryDao.Get(id)
+	if err != nil {
+		return nil, err
+	}
+	var repo dto.Repository
+	gocopy.Copy(&repo, &repository)
+	tags, err := s.tagDao.GetTagByRepoId(id)
+	if err != nil {
+		return nil, err
+	}
+	for _, tag := range tags {
+		repo.Tags = append(repo.Tags, tag.Label)
+	}
+	return &repo, nil
+}
+
+func (s *RepositoryService) constructFileDir(path string) (*dto.FileDescribe, error) {
+	parts := strings.Split(path, string(filepath.Separator))
+	if len(parts) == 0 {
+		return nil, nil
+	}
+	isDir := len(parts) > 1
+	return &dto.FileDescribe{
+		Name:  parts[0],
+		IsDir: isDir,
+	}, nil
 }

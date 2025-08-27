@@ -63,6 +63,13 @@ func (d *TagDao) CreateBatch(tags []*model.Tag) error {
 	return nil
 }
 
+func (d *TagDao) GetTagByRepoId(repoId int64) ([]*model.Tag, error) {
+	var tags []*model.Tag
+	err := d.baseData.BizDB.Table("tag t1").
+		Where(" t1.id in (SELECT x.tag_id FROM repository_tag x where x.repo_id = ?)", repoId).Find(&tags).Error
+	return tags, err
+}
+
 func (d *TagDao) TagListByCondition(condition *query.TagQuery) ([]*model.Tag, error) {
 	var tags []*model.Tag
 	query := d.baseData.BizDB.Table("tag")

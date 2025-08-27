@@ -19,6 +19,7 @@ type Repository struct {
 	PipelineTagId string    `gorm:"column:pipeline_tag_id;not null" json:"pipeline_tag_id"`
 	LastModified  string    `gorm:"column:last_modified;not null" json:"last_modified"`
 	UsedStorage   int64     `gorm:"column:used_storage;" json:"used_storage"`
+	Sha           string    `gorm:"column:sha;not null" json:"sha"`
 	CreatedAt     time.Time `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt     time.Time `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
 }
