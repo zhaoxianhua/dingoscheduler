@@ -58,4 +58,6 @@ func (r *HttpRouter) initRouter() {
 	r.echo.GET("/api/v1/repository/card/:id", r.alayanewHandler.RepositoryCardHandler)
 
 	r.echo.GET("/api/v1/tags", r.alayanewHandler.TagHandler)
+	r.echo.GET("/api/v1/task_tags", r.alayanewHandler.TaskTagHandler)
+	r.echo.GET("/api/v1/main_tags", r.alayanewHandler.MainTagHandler)
 }
