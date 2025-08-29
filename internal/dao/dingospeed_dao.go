@@ -66,23 +66,6 @@ func (d *DingospeedDao) GetEntityById(id int32) (*model.Dingospeed, error) {
 
 func (d *DingospeedDao) GetEntity(instanceId string, online bool) (*model.Dingospeed, error) {
 	speeds := make([]model.Dingospeed, 0)
-	// sql := fmt.Sprintf("select * from dingospeed where instance_id = '%s' and online = %v limit 1", instanceId, online)
-	// if err := d.baseData.BizDB.Raw(sql).Scan(&speed).Error; err != nil { // [mysql] 2025/07/30 11:18:38 packets.go:68 [warn] unexpected sequence nr: expected 1, got 2
-	// 	if errors.Is(err, gorm.ErrRecordNotFound) {
-	// 		return nil, nil
-	// 	}
-	// 	return nil, err
-	// }
-	// 1个？=》 {"level":"ERROR","time":"2025-07-30 11:25:53","caller":"service/manager_service.go:62","msg":"getEntity err.Error 1105 (HY000): not a literal: ?1"}
-	// 没有？=>{"level":"ERROR","time":"2025-07-30 11:30:21","caller":"service/manager_service.go:62","msg":"getEntity err.Error 1105 (HY000): not a literal: ?0"}
-	// if err := d.baseData.BizDB.Table("dingospeed").Where(fmt.Sprintf("instance_id = '%s'", instanceId)).First(&speed2).Error; err != nil {
-	// var speed model.Dingospeed
-	// if err := d.baseData.BizDB.Table("dingospeed").Where("instance_id = ? and online = ?", instanceId, online).First(&speed).Error; err != nil {
-	// 	if errors.Is(err, gorm.ErrRecordNotFound) {
-	// 		return nil, nil
-	// 	}
-	// 	return nil, err
-	// }
 	if err := d.baseData.BizDB.Table("dingospeed").Where("instance_id = ? and online = ?", instanceId, online).Find(&speeds).Error; err != nil {
 		return nil, err
 	}

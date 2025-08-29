@@ -21,12 +21,6 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type Body struct {
-	Code int         `json:"code"`
-	Data interface{} `json:"data"`
-	Msg  string      `json:"msg"`
-}
-
 func ErrorRepoNotFound(ctx echo.Context) error {
 	content := map[string]string{
 		"error": "Repository not found",
@@ -139,17 +133,14 @@ func Response(ctx echo.Context, httpStatus int, headers map[string]string, data 
 }
 
 func ResponseData(ctx echo.Context, data interface{}) error {
-	return ctx.JSON(http.StatusOK, Body{
-		Code: 200,
-		Data: data,
-	})
+	return ctx.JSON(http.StatusOK, data)
 }
 
 func ResponseError(ctx echo.Context, err error) error {
-	return ctx.JSON(http.StatusInternalServerError, Body{
-		Code: http.StatusInternalServerError,
-		Msg:  err.Error(),
-	})
+	content := map[string]string{
+		"error": err.Error(),
+	}
+	return ctx.JSON(http.StatusInternalServerError, content)
 }
 
 func fullHeaders(c echo.Context, headers map[string]string) {

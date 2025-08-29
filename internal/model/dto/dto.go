@@ -10,9 +10,3 @@ type Repository struct {
 	Sha           string   `json:"sha"`
 	Tags          []string `json:"tags,omitempty" `
 }
-
-type FileDescribe struct {
-	Name  string `json:"name"`
-	Size  int64  `json:"size"`
-	IsDir bool   `json:"isDir"`
-}

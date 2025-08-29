@@ -44,7 +44,7 @@ func (d *RepositoryDao) Save(repository *model.Repository) error {
 
 func (d *RepositoryDao) Get(id int64) (*model.Repository, error) {
 	var repository []*model.Repository
-	if err := d.baseData.BizDB.Model(&model.Repository{}).Select("id, org_repo,like_num, download_num, pipeline_tag_id,last_modified ").Where("id = ?", id).Find(&repository).Error; err != nil {
+	if err := d.baseData.BizDB.Model(&model.Repository{}).Select("id, org_repo,like_num, download_num, pipeline_tag_id,last_modified,sha ").Where("id = ?", id).Find(&repository).Error; err != nil {
 		return nil, err
 	}
 	if len(repository) > 0 {

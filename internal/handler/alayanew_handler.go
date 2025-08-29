@@ -11,6 +11,7 @@ import (
 	"dingoscheduler/pkg/util"
 
 	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 )
 
 type AlayanewHandler struct {
@@ -28,11 +29,19 @@ func NewAlayanewHandler(repositoryService *service.RepositoryService, tagService
 func (handler *AlayanewHandler) RepositoriesHandler(c echo.Context) error {
 	name := c.QueryParam("name")
 	instanceId := c.QueryParam("instanceId")
-	page, _ := strconv.Atoi(c.QueryParam("page"))
+	page, err := strconv.Atoi(c.QueryParam("page"))
+	if err != nil {
+		zap.S().Errorf("param conv err.%v", err)
+		return util.ErrorRequestParam(c)
+	}
 	if page < 1 {
 		page = 1
 	}
-	pageSize, _ := strconv.Atoi(c.QueryParam("pageSize"))
+	pageSize, err := strconv.Atoi(c.QueryParam("pageSize"))
+	if err != nil {
+		zap.S().Errorf("param conv err.%v", err)
+		return util.ErrorRequestParam(c)
+	}
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 10
 	}
@@ -81,15 +90,24 @@ func (handler *AlayanewHandler) RepositoryInfoHandler(c echo.Context) error {
 }
 
 func (handler *AlayanewHandler) RepositoryCardHandler(c echo.Context) error {
+	instanceId := c.Param("instanceId")
 	id := util.Atoi64(c.Param("id"))
-	model, err := handler.repositoryService.RepositoryCardById(id)
+	err := handler.repositoryService.RepositoryCardById(c, instanceId, id)
 	if err != nil {
-		if e, ok := err.(myerr.Error); ok {
-			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
-		}
 		return util.ResponseError(c, err)
 	}
-	return util.ResponseData(c, model)
+	return nil
+}
+
+func (handler *AlayanewHandler) RepositoryFilesHandler(c echo.Context) error {
+	instanceId := c.Param("instanceId")
+	id := util.Atoi64(c.Param("id"))
+	filePath := c.Param("filePath")
+	err := handler.repositoryService.RepositoryFilesById(c, instanceId, id, filePath)
+	if err != nil {
+		return util.ResponseError(c, err)
+	}
+	return nil
 }
 
 func (handler *AlayanewHandler) TagHandler(c echo.Context) error {

@@ -16,9 +16,9 @@ package service
 
 import (
 	"fmt"
+	"io"
 	"net/http"
-	"path/filepath"
-	"strings"
+	"net/url"
 
 	"dingoscheduler/internal/dao"
 	"dingoscheduler/internal/model"
@@ -38,6 +38,7 @@ type RepositoryService struct {
 	modelFileProcessDao *dao.ModelFileProcessDao
 	repositoryDao       *dao.RepositoryDao
 	tagDao              *dao.TagDao
+	client              *http.Client
 }
 
 func NewRepositoryService(dingospeedDao *dao.DingospeedDao, modelFileProcessDao *dao.ModelFileProcessDao,
@@ -47,6 +48,7 @@ func NewRepositoryService(dingospeedDao *dao.DingospeedDao, modelFileProcessDao 
 		repositoryDao:       repositoryDao,
 		modelFileProcessDao: modelFileProcessDao,
 		tagDao:              tagDao,
+		client:              &http.Client{},
 	}
 }
 
@@ -141,31 +143,89 @@ func (s *RepositoryService) GetRepositoryById(id int64) (*dto.Repository, error)
 	return &repo, nil
 }
 
-func (s *RepositoryService) RepositoryCardById(id int64) (*dto.Repository, error) {
-	repository, err := s.repositoryDao.Get(id)
+func (s *RepositoryService) RepositoryCardById(c echo.Context, instanceId string, id int64) error {
+	targetURL, repository, err := s.getRepository(instanceId, id)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	var repo dto.Repository
-	gocopy.Copy(&repo, &repository)
-	tags, err := s.tagDao.GetTagByRepoId(id)
+	forwardURL := fmt.Sprintf("%s/models/%s/resolve/%s/README.md", targetURL.String(), repository.OrgRepo, repository.Sha)
+	resp, err := s.requestForward(c, targetURL, forwardURL)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	for _, tag := range tags {
-		repo.Tags = append(repo.Tags, tag.Label)
+	defer resp.Body.Close()
+	for key, values := range resp.Header {
+		for _, value := range values {
+			c.Response().Header().Add(key, value)
+		}
 	}
-	return &repo, nil
+	c.Response().WriteHeader(resp.StatusCode)
+	if _, err := io.Copy(c.Response().Writer, resp.Body); err != nil {
+		return fmt.Errorf("响应内容回传失败")
+	}
+	return nil
 }
 
-func (s *RepositoryService) constructFileDir(path string) (*dto.FileDescribe, error) {
-	parts := strings.Split(path, string(filepath.Separator))
-	if len(parts) == 0 {
-		return nil, nil
+func (s *RepositoryService) RepositoryFilesById(c echo.Context, instanceId string, id int64, filePath string) error {
+	targetURL, repository, err := s.getRepository(instanceId, id)
+	if err != nil {
+		return err
 	}
-	isDir := len(parts) > 1
-	return &dto.FileDescribe{
-		Name:  parts[0],
-		IsDir: isDir,
-	}, nil
+	forwardURL := fmt.Sprintf("%s/api/models/%s/files/%s", targetURL.String(), repository.OrgRepo, repository.Sha)
+	if filePath != "" {
+		forwardURL += fmt.Sprintf("/%s", filePath)
+	}
+	resp, err := s.requestForward(c, targetURL, forwardURL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	for key, values := range resp.Header {
+		for _, value := range values {
+			c.Response().Header().Add(key, value)
+		}
+	}
+	c.Response().WriteHeader(resp.StatusCode)
+	if _, err := io.Copy(c.Response().Writer, resp.Body); err != nil {
+		return fmt.Errorf("响应内容回传失败")
+	}
+	return nil
+}
+
+func (s *RepositoryService) getRepository(instanceId string, id int64) (*url.URL, *model.Repository, error) {
+	entity, err := s.dingospeedDao.GetEntity(instanceId, true)
+	if err != nil {
+		return nil, nil, fmt.Errorf("GetEntity err")
+	}
+	if entity == nil {
+		return nil, nil, fmt.Errorf("该区域dingspeed未注册。")
+	}
+	repository, err := s.repositoryDao.Get(id)
+	if err != nil {
+		return nil, nil, fmt.Errorf("repositoryDao get err")
+	}
+	speedDomain := fmt.Sprintf("http://%s:%d", entity.Host, entity.Port)
+	targetURL, err := url.Parse(speedDomain)
+	if err != nil {
+		return nil, nil, fmt.Errorf("目标服务URL解析失败")
+	}
+	return targetURL, repository, nil
+}
+
+func (s *RepositoryService) requestForward(c echo.Context, targetURL *url.URL, forwardURL string) (*http.Response, error) {
+	req, err := http.NewRequest(c.Request().Method, forwardURL, c.Request().Body)
+	if err != nil {
+		return nil, fmt.Errorf("创建转发请求失败")
+	}
+	for key, values := range c.Request().Header {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
+	req.Host = targetURL.Host
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("转发请求到目标服务失败")
+	}
+	return resp, nil
 }
