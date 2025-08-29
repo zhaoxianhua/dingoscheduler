@@ -3,8 +3,7 @@ package dao
 import (
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
-	"dingoscheduler/internal/model/query"
-
+	modelquery "dingoscheduler/internal/model/query"
 	"go.uber.org/zap"
 )
 
@@ -70,9 +69,13 @@ func (d *TagDao) GetTagByRepoId(repoId int64) ([]*model.Tag, error) {
 	return tags, err
 }
 
-func (d *TagDao) TagListByCondition(condition *query.TagQuery) ([]*model.Tag, error) {
+func (d *TagDao) TagListByCondition(condition *modelquery.TagQuery) ([]*model.Tag, error) {
 	var tags []*model.Tag
 	query := d.baseData.BizDB.Table("tag")
+
+	if len(condition.Labels) > 0 {
+		query = query.Where("label IN (?)", condition.Labels)
+	}
 
 	if len(condition.Types) > 0 {
 		query = query.Where("type IN (?)", condition.Types)

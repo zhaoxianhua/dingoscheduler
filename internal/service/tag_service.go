@@ -18,16 +18,123 @@ func NewTagService(tagDao *dao.TagDao) *TagService {
 	}
 }
 
+var subTypeMap = map[string]string{
+	"multimodal": "Multimodal",
+	"cv":         "Computer Vision",
+	"nlp":        "Natural Language Processing",
+	"audio":      "Audio",
+	"tabular":    "Tabular",
+	"rl":         "Reinforcement Learning",
+	"other":      "Other",
+}
+
+var orderedSubTypes = []string{
+	"multimodal",
+	"cv",
+	"nlp",
+	"audio",
+	"tabular",
+	"rl",
+	"other",
+}
+
+var targetLabels = []string{
+	"Text Generation",
+	"Any-to-Any",
+	"Image-Text-to-Text",
+	"Image-to-Text",
+	"Image-to-Image",
+	"Text-to-Image",
+	"Text-to-Video",
+	"Text-to-Speech",
+	"PyTorch",
+	"TensorFlow",
+	"JAX",
+	"Transformers",
+	"Diffusers",
+	"Safetensors",
+	"ONNX",
+	"GGUF",
+	"Transformers.js",
+	"MLX",
+	"Keras",
+}
+
+// type字段值映射表
+var typeMapping = map[string]string{
+	"pipeline_tag": "Tasks",
+	"library":      "Libraries",
+}
+
 func (t *TagService) TagListByCondition(query *query.TagQuery) ([]*dto.Tag, error) {
-	// 调用DAO层的ListByCondition方法查询标签
 	tags, err := t.tagDao.TagListByCondition(query)
 	if err != nil {
 		return nil, err
 	}
 
-	// 转换为DTO对象
 	tagDTOs := make([]*dto.Tag, 0, len(tags))
 	gocopy.Copy(&tagDTOs, &tags)
 
 	return tagDTOs, nil
+}
+
+func (t *TagService) TaskTagList(query *query.TagQuery) ([]*dto.GroupedTagDTO, error) {
+	tags, err := t.tagDao.TagListByCondition(query)
+	if err != nil {
+		return nil, err
+	}
+
+	tagDTOs := make([]*dto.Tag, 0, len(tags))
+	gocopy.Copy(&tagDTOs, &tags)
+
+	groupMap := make(map[string][]*dto.Tag)
+	for _, tag := range tagDTOs {
+		groupMap[tag.SubType] = append(groupMap[tag.SubType], tag)
+	}
+
+	result := make([]*dto.GroupedTagDTO, 0)
+	for _, subType := range orderedSubTypes {
+		if tagsInGroup, exists := groupMap[subType]; exists {
+			result = append(result, &dto.GroupedTagDTO{
+				SubType: subTypeMap[subType],
+				Tags:    tagsInGroup,
+			})
+		}
+	}
+
+	return result, nil
+}
+
+func (t *TagService) MainTagList() ([]*dto.GroupedByTypeDTO, error) {
+	condition := &query.TagQuery{
+		Labels: targetLabels,
+	}
+
+	tags, err := t.tagDao.TagListByCondition(condition)
+	if err != nil {
+		return nil, err
+	}
+
+	tagDTOs := make([]*dto.Tag, 0, len(tags))
+	gocopy.Copy(&tagDTOs, &tags)
+
+	groupMap := make(map[string][]*dto.Tag)
+	for _, tag := range tagDTOs {
+		groupMap[tag.Type] = append(groupMap[tag.Type], tag)
+	}
+
+	result := make([]*dto.GroupedByTypeDTO, 0, len(groupMap))
+	for typ, tagsInGroup := range groupMap {
+		mappedType, exists := typeMapping[typ]
+		if !exists {
+			mappedType = typ
+		}
+
+		result = append(result, &dto.GroupedByTypeDTO{
+			Type: mappedType,
+			Tags: tagsInGroup,
+		})
+	}
+
+	return result, nil
 }

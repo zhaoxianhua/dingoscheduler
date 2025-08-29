@@ -142,3 +142,27 @@ func (handler *AlayanewHandler) TagHandler(c echo.Context) error {
 	}
 	return util.ResponseData(c, tags)
 }
+
+func (handler *AlayanewHandler) TaskTagHandler(c echo.Context) error {
+	taskTags, err := handler.tagService.TaskTagList(&query.TagQuery{
+		Types: []string{"pipeline_tag"},
+	})
+	if err != nil {
+		if e, ok := err.(myerr.Error); ok {
+			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
+		}
+		return util.ErrorProxyError(c)
+	}
+	return util.ResponseData(c, taskTags)
+}
+
+func (handler *AlayanewHandler) MainTagHandler(c echo.Context) error {
+	mainTags, err := handler.tagService.MainTagList()
+	if err != nil {
+		if e, ok := err.(myerr.Error); ok {
+			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
+		}
+		return util.ErrorProxyError(c)
+	}
+	return util.ResponseData(c, mainTags)
+}
