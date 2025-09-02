@@ -52,9 +52,19 @@ func NewRepositoryService(dingospeedDao *dao.DingospeedDao, modelFileProcessDao 
 	}
 }
 
-func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepoQuery) error {
-	zap.S().Debugf("PersistRepo instanceId:%s", query.InstanceIds)
-	for _, instanceId := range query.InstanceIds {
+func (s *RepositoryService) PersistRepo(c echo.Context, repoQuery *query.PersistRepoQuery) error {
+	zap.S().Debugf("PersistRepo instanceId:%s", repoQuery.InstanceIds)
+	pipelineTags, err := s.tagDao.TagListByCondition(&query.TagQuery{
+		Types: []string{"pipeline_tag"},
+	})
+	if err != nil {
+		return err
+	}
+	pipelineMap := make(map[string]string, 0)
+	for _, item := range pipelineTags {
+		pipelineMap[item.ID] = item.Label
+	}
+	for _, instanceId := range repoQuery.InstanceIds {
 		// 存在下载记录和进度，但模型在仓库不存在。
 		freeRepositories, err := s.repositoryDao.GetFreeRepository(instanceId)
 		if err != nil {
@@ -73,7 +83,7 @@ func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepo
 			}
 			speedDomain := fmt.Sprintf("http://%s:%d", entity.Host, entity.Port)
 			orgRepo := util.GetOrgRepo(repository.Org, repository.Repo)
-			resp, err := s.dingospeedDao.RemoteRequestMeta(speedDomain, repository.Datatype, orgRepo, "main", query.Token)
+			resp, err := s.dingospeedDao.RemoteRequestMeta(speedDomain, repository.Datatype, orgRepo, "main", repoQuery.Token)
 			if err != nil {
 				return err
 			}
@@ -96,6 +106,7 @@ func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepo
 				LikeNum:       metaData.Likes,
 				DownloadNum:   metaData.Downloads,
 				PipelineTagId: metaData.PipelineTag,
+				PipelineTag:   pipelineMap[metaData.PipelineTag],
 				LastModified:  metaData.LastModified,
 				UsedStorage:   metaData.UsedStorage,
 				Sha:           metaData.Sha,

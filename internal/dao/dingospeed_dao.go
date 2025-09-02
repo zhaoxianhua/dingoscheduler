@@ -34,7 +34,8 @@ func NewDingospeedDao(data *data.BaseData) *DingospeedDao {
 }
 
 func (d *DingospeedDao) Save(speed *model.Dingospeed) error {
-	if err := d.baseData.BizDB.Model(&model.Dingospeed{}).Save(speed).Error; err != nil {
+	insertSql := "INSERT INTO dingospeed(instance_id, host, port, online) VALUES(?,?,?,?)"
+	if err := d.baseData.BizDB.Exec(insertSql, speed.InstanceID, speed.Host, speed.Port, speed.Online).Error; err != nil {
 		return err
 	}
 	return nil

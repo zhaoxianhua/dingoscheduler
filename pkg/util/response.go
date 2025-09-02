@@ -136,9 +136,9 @@ func ResponseData(ctx echo.Context, data interface{}) error {
 	return ctx.JSON(http.StatusOK, data)
 }
 
-func ResponseError(ctx echo.Context, err error) error {
+func ResponseError(ctx echo.Context) error {
 	content := map[string]string{
-		"error": err.Error(),
+		"error": "操作失败",
 	}
 	return ctx.JSON(http.StatusInternalServerError, content)
 }

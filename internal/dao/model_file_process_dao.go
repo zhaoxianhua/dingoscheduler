@@ -25,6 +25,7 @@ import (
 	pb "dingoscheduler/pkg/proto/manager"
 	"dingoscheduler/pkg/util"
 
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -39,7 +40,32 @@ func NewModelFileProcessDao(data *data.BaseData) *ModelFileProcessDao {
 }
 
 func (d *ModelFileProcessDao) Save(process *model.ModelFileProcess) error {
-	if err := d.baseData.BizDB.Model(&model.ModelFileProcess{}).Save(process).Error; err != nil {
+	sql := "INSERT INTO model_file_process(record_id, instance_id, offset_num, status, master_instance_id) VALUES(?,?,?,?,?)"
+	if err := d.baseData.BizDB.Exec(sql, process.RecordID, process.InstanceID, process.OffsetNum, process.Status, process.MasterInstanceID).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *ModelFileProcessDao) BatchSave(processes []model.ModelFileProcess) error {
+	tx := d.baseData.BizDB.Begin()
+	if tx.Error != nil {
+		zap.S().Error("开启事务失败: %v", tx.Error)
+		return tx.Error
+	}
+	sql := "INSERT INTO model_file_process(record_id, instance_id, offset_num, status, master_instance_id) VALUES(?,?,?,?,?)"
+	for _, process := range processes {
+		result := tx.Exec(sql, process.RecordID, process.InstanceID, process.OffsetNum, process.Status, process.MasterInstanceID)
+		if result.Error != nil {
+			// 出错回滚事务
+			tx.Rollback()
+			zap.S().Error("批量插入失败: %v", result.Error)
+			return result.Error
+		}
+	}
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		zap.S().Fatalf("事务提交失败: %v", err)
 		return err
 	}
 	return nil
@@ -91,13 +117,6 @@ func (d *ModelFileProcessDao) GetModelFileProcessByInstanceId(recordId int64, in
 		return nil, err
 	}
 	return processes[0], nil
-}
-
-func (d *ModelFileProcessDao) BatchSave(records []model.ModelFileProcess) error {
-	if err := d.baseData.BizDB.Model(&model.ModelFileProcess{}).CreateInBatches(&records, 5).Error; err != nil {
-		return err
-	}
-	return nil
 }
 
 // ExistRecordIDs 查询指定InstanceID下，哪些RecordID已存在对应的ModelFileProcess记录

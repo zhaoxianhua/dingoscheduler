@@ -35,16 +35,9 @@ func NewRepositoryDao(data *data.BaseData) *RepositoryDao {
 	}
 }
 
-func (d *RepositoryDao) Save(repository *model.Repository) error {
-	if err := d.baseData.BizDB.Model(&model.Repository{}).Save(repository).Error; err != nil {
-		return err
-	}
-	return nil
-}
-
 func (d *RepositoryDao) Get(id int64) (*model.Repository, error) {
 	var repository []*model.Repository
-	if err := d.baseData.BizDB.Model(&model.Repository{}).Select("id, org_repo,like_num, download_num, pipeline_tag_id,last_modified,sha ").Where("id = ?", id).Find(&repository).Error; err != nil {
+	if err := d.baseData.BizDB.Model(&model.Repository{}).Select("id, org_repo,like_num, download_num, pipeline_tag,last_modified,sha ").Where("id = ?", id).Find(&repository).Error; err != nil {
 		return nil, err
 	}
 	if len(repository) > 0 {
@@ -81,12 +74,37 @@ func (d *RepositoryDao) GetFreeRepository(instanceId string) ([]*model.Repositor
 
 func (d *RepositoryDao) ModelList(query *query.ModelQuery) ([]*model.Repository, int64, error) {
 	var repositories []*model.Repository
-	db := d.baseData.BizDB.Model(&model.Repository{}).Select("id, org_repo,like_num, download_num, pipeline_tag_id,last_modified ")
+	db := d.baseData.BizDB.Model(&model.Repository{}).Select("id, org_repo,like_num, download_num, pipeline_tag, last_modified ")
 	if query.InstanceId != "" {
 		db.Where("instance_id = ?", query.InstanceId)
 	}
 	if query.Name != "" {
 		db.Where(fmt.Sprintf("org_repo like '%s'", "%"+query.Name+"%"))
+	}
+	if query.PipelineTag != "" {
+		db.Where("pipeline_tag_id = ?", query.PipelineTag)
+	}
+	tags := make([]string, 0)
+	if query.Library != "" {
+		tags = append(tags, query.Library)
+	}
+	if query.Apps != "" {
+		tags = append(tags, query.Apps)
+	}
+	if query.InferenceProvider != "" {
+		tags = append(tags, query.InferenceProvider)
+	}
+	if query.Language != "" {
+		tags = append(tags, query.Language)
+	}
+	if query.License != "" {
+		tags = append(tags, query.License)
+	}
+	if query.Other != "" {
+		tags = append(tags, query.Other)
+	}
+	if len(tags) > 0 {
+		db.Where(" id in (select repo_id from repository_tag where tag_id in (?))", tags)
 	}
 	var count int64
 	if err := db.Count(&count).Error; err != nil {

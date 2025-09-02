@@ -36,18 +36,29 @@ func NewModelFileRecordDao(data *data.BaseData) *ModelFileRecordDao {
 	}
 }
 
-func (d *ModelFileRecordDao) Save(records *model.ModelFileRecord) error {
-	if err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Save(records).Error; err != nil {
-		return err
-	}
-	return nil
-}
-
 func (d *ModelFileRecordDao) BatchSave(records []model.ModelFileRecord) error {
-	if err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).CreateInBatches(&records, 5).Error; err != nil {
+	tx := d.baseData.BizDB.Begin()
+	if tx.Error != nil {
+		zap.S().Error("开启事务失败: %v", tx.Error)
+		return tx.Error
+	}
+	sql := "INSERT INTO model_file_record(datatype, org, repo, name, etag, file_size)VALUES(?,?,?,?,?,?)"
+	for _, record := range records {
+		result := tx.Exec(sql, record.Datatype, record.Org, record.Repo, record.Name, record.Etag, record.FileSize)
+		if result.Error != nil {
+			// 出错回滚事务
+			tx.Rollback()
+			zap.S().Error("批量插入失败: %v", result.Error)
+			return result.Error
+		}
+	}
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		zap.S().Fatalf("事务提交失败: %v", err)
 		return err
 	}
 	return nil
+
 }
 
 func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecordQuery) (*model.ModelFileRecord, error) {
@@ -85,17 +96,28 @@ func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, p
 			Etag:     req.Etag,
 			FileSize: req.FileSize,
 		}
-		if err := tx.Create(record).Error; err != nil {
+		recordSql := "INSERT INTO model_file_record(datatype, org, repo, name, etag, file_size) VALUES (?,?,?,?,?,?)"
+		db, err := tx.DB()
+		if err != nil {
 			return err
 		}
-		process.RecordID = record.ID
+		result, err := db.Exec(recordSql, record.Datatype, record.Org, record.Repo, record.Name, record.Etag, record.FileSize)
+		if err != nil {
+			return err
+		}
+		lastId, err := result.LastInsertId()
+		if err != nil {
+			return err
+		}
+		process.RecordID = lastId
 		process.OffsetNum = 0 // 初始
-		if err := tx.Create(process).Error; err != nil {
+		processSql := "INSERT INTO model_file_process(record_id, instance_id, offset_num, status, master_instance_id) VALUES(?,?,?,?,?)"
+		if err := tx.Exec(processSql, process.RecordID, process.InstanceID, process.OffsetNum, process.Status, process.MasterInstanceID).Error; err != nil {
 			return err
 		}
 		return nil
 	}); err != nil {
-		zap.S().Error("SaveSchedulerRecord err.%v", err)
+		zap.S().Errorf("SaveSchedulerRecord err.%v", err)
 		return err
 	}
 	return nil
