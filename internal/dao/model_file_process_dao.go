@@ -39,12 +39,21 @@ func NewModelFileProcessDao(data *data.BaseData) *ModelFileProcessDao {
 	}
 }
 
-func (d *ModelFileProcessDao) Save(process *model.ModelFileProcess) error {
-	sql := "INSERT INTO model_file_process(record_id, instance_id, offset_num, status, master_instance_id) VALUES(?,?,?,?,?)"
-	if err := d.baseData.BizDB.Exec(sql, process.RecordID, process.InstanceID, process.OffsetNum, process.Status, process.MasterInstanceID).Error; err != nil {
-		return err
+func (d *ModelFileProcessDao) Save(process *model.ModelFileProcess) (int64, error) {
+	return SaveProcessBySql(d.baseData.BizDB, process)
+}
+
+func SaveProcessBySql(tx *gorm.DB, process *model.ModelFileProcess) (int64, error) {
+	recordSql := fmt.Sprintf("INSERT INTO model_file_process(record_id, instance_id, offset_num, status, master_instance_id) VALUES (%d, '%s',%d,%d,'%s')", process.RecordID, process.InstanceID, process.OffsetNum, process.Status, process.MasterInstanceID)
+	db, err := tx.DB()
+	if err != nil {
+		return 0, err
 	}
-	return nil
+	result, err := db.Exec(recordSql)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 func (d *ModelFileProcessDao) BatchSave(processes []model.ModelFileProcess) error {

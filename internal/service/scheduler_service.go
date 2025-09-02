@@ -63,6 +63,7 @@ func (s *SchedulerService) Register(ctx context.Context, req *pb.RegisterRequest
 		zap.S().Errorf("getEntity err.%v", err)
 		return nil, err
 	}
+
 	if speed != nil {
 		dingospeed.ID = speed.ID
 		err = s.dingospeedDao.RegisterUpdate(&dingospeed)
@@ -70,10 +71,11 @@ func (s *SchedulerService) Register(ctx context.Context, req *pb.RegisterRequest
 			return nil, err
 		}
 	} else {
-		err = s.dingospeedDao.Save(&dingospeed)
+		id, err := s.dingospeedDao.Save(&dingospeed)
 		if err != nil {
 			return nil, err
 		}
+		dingospeed.ID = int32(id)
 	}
 	zap.S().Infof("register success.instanceId:%s, host:%s, port:%d, online:%v", req.InstanceId, req.Host, req.Port, req.Online)
 	return &pb.RegisterResponse{
@@ -155,8 +157,10 @@ func (s *SchedulerService) SchedulerFile(ctx context.Context, req *pb.SchedulerF
 				return resp, nil
 			} else {
 				process.RecordID = record.ID
-				if err = s.modelFileProcessDao.Save(process); err != nil {
+				if processId, err := s.modelFileProcessDao.Save(process); err != nil {
 					return nil, err
+				} else {
+					process.ID = processId
 				}
 				resp.ProcessId = process.ID
 				return resp, nil
@@ -164,8 +168,10 @@ func (s *SchedulerService) SchedulerFile(ctx context.Context, req *pb.SchedulerF
 		} else {
 			process.RecordID = record.ID
 			process.OffsetNum = 0
-			if err = s.modelFileProcessDao.Save(process); err != nil {
+			if processId, err := s.modelFileProcessDao.Save(process); err != nil {
 				return nil, err
+			} else {
+				process.ID = processId
 			}
 			resp = &pb.SchedulerFileResponse{
 				SchedulerType: consts.SchedulerNo,
@@ -174,8 +180,10 @@ func (s *SchedulerService) SchedulerFile(ctx context.Context, req *pb.SchedulerF
 		}
 		return resp, nil
 	} else {
-		if err = s.modelFileRecordDao.SaveSchedulerRecord(req, process); err != nil {
+		if processId, err := s.modelFileRecordDao.SaveSchedulerRecord(req, process); err != nil {
 			return nil, err
+		} else {
+			process.ID = processId
 		}
 		return &pb.SchedulerFileResponse{
 			SchedulerType: consts.SchedulerNo,
@@ -208,18 +216,17 @@ func (s *SchedulerService) SyncFileProcess(ctx context.Context, req *pb.Schedule
 			process.RecordID = record.ID
 			process.OffsetNum = req.EndPos
 			process.Status = 3 // download complete
-			if err = s.modelFileProcessDao.Save(process); err != nil {
+			if _, err = s.modelFileProcessDao.Save(process); err != nil {
 				return nil, err
 			}
 		}
 		return nil, nil
 	} else {
-		if err = s.modelFileRecordDao.SaveSchedulerRecord(req, process); err != nil {
+		if _, err = s.modelFileRecordDao.SaveSchedulerRecord(req, process); err != nil {
 			return nil, err
 		}
 		return nil, nil
 	}
-	return nil, nil
 }
 
 func (s *SchedulerService) ReportFileProcess(ctx context.Context, req *pb.FileProcessRequest) (*emptypb.Empty, error) {

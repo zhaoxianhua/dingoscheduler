@@ -33,12 +33,17 @@ func NewDingospeedDao(data *data.BaseData) *DingospeedDao {
 	}
 }
 
-func (d *DingospeedDao) Save(speed *model.Dingospeed) error {
-	insertSql := "INSERT INTO dingospeed(instance_id, host, port, online) VALUES(?,?,?,?)"
-	if err := d.baseData.BizDB.Exec(insertSql, speed.InstanceID, speed.Host, speed.Port, speed.Online).Error; err != nil {
-		return err
+func (d *DingospeedDao) Save(speed *model.Dingospeed) (int64, error) {
+	insertSql := fmt.Sprintf("INSERT INTO dingospeed(instance_id, host, port, online) VALUES('%s','%s',%d,%v)", speed.InstanceID, speed.Host, speed.Port, speed.Online)
+	db, err := d.baseData.BizDB.DB()
+	if err != nil {
+		return 0, err
 	}
-	return nil
+	result, err := db.Exec(insertSql)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 func (d *DingospeedDao) RegisterUpdate(speed *model.Dingospeed) error {

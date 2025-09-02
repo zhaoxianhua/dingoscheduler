@@ -58,7 +58,19 @@ func (d *ModelFileRecordDao) BatchSave(records []model.ModelFileRecord) error {
 		return err
 	}
 	return nil
+}
 
+func SaveRecordBySql(tx *gorm.DB, record *model.ModelFileRecord) (int64, error) {
+	recordSql := fmt.Sprintf("INSERT INTO model_file_record(datatype, org, repo, name, etag, file_size) VALUES ('%s','%s','%s','%s','%s',%d)", record.Datatype, record.Org, record.Repo, record.Name, record.Etag, record.FileSize)
+	db, err := tx.DB()
+	if err != nil {
+		return 0, err
+	}
+	result, err := db.Exec(recordSql)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecordQuery) (*model.ModelFileRecord, error) {
@@ -86,7 +98,8 @@ func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecord
 	return nil, nil
 }
 
-func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, process *model.ModelFileProcess) error {
+func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, process *model.ModelFileProcess) (int64, error) {
+	var processId int64
 	if err := d.baseData.BizDB.Transaction(func(tx *gorm.DB) error {
 		record := &model.ModelFileRecord{
 			Datatype: req.DataType,
@@ -96,31 +109,22 @@ func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, p
 			Etag:     req.Etag,
 			FileSize: req.FileSize,
 		}
-		recordSql := "INSERT INTO model_file_record(datatype, org, repo, name, etag, file_size) VALUES (?,?,?,?,?,?)"
-		db, err := tx.DB()
-		if err != nil {
-			return err
-		}
-		result, err := db.Exec(recordSql, record.Datatype, record.Org, record.Repo, record.Name, record.Etag, record.FileSize)
-		if err != nil {
-			return err
-		}
-		lastId, err := result.LastInsertId()
+		lastId, err := SaveRecordBySql(tx, record)
 		if err != nil {
 			return err
 		}
 		process.RecordID = lastId
 		process.OffsetNum = 0 // 初始
-		processSql := "INSERT INTO model_file_process(record_id, instance_id, offset_num, status, master_instance_id) VALUES(?,?,?,?,?)"
-		if err := tx.Exec(processSql, process.RecordID, process.InstanceID, process.OffsetNum, process.Status, process.MasterInstanceID).Error; err != nil {
+		processId, err = SaveProcessBySql(tx, process)
+		if err != nil {
 			return err
 		}
 		return nil
 	}); err != nil {
 		zap.S().Errorf("SaveSchedulerRecord err.%v", err)
-		return err
+		return 0, err
 	}
-	return nil
+	return processId, nil
 }
 
 // ExistEtags 查询指定Etag列表中已存在的Etag
