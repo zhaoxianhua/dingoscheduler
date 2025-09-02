@@ -38,13 +38,20 @@ type SchedulerService struct {
 	dingospeedDao       *dao.DingospeedDao
 	modelFileRecordDao  *dao.ModelFileRecordDao
 	modelFileProcessDao *dao.ModelFileProcessDao
+	repositoryDao       *dao.RepositoryDao
 }
 
-func NewSchedulerService(dingospeedDao *dao.DingospeedDao, modelFileRecordDao *dao.ModelFileRecordDao, modelFileProcessDao *dao.ModelFileProcessDao) *SchedulerService {
+func NewSchedulerService(
+	dingospeedDao *dao.DingospeedDao,
+	modelFileRecordDao *dao.ModelFileRecordDao,
+	modelFileProcessDao *dao.ModelFileProcessDao,
+	repositoryDao *dao.RepositoryDao,
+) *SchedulerService {
 	return &SchedulerService{
 		dingospeedDao:       dingospeedDao,
 		modelFileRecordDao:  modelFileRecordDao,
 		modelFileProcessDao: modelFileProcessDao,
+		repositoryDao:       repositoryDao,
 	}
 }
 
@@ -227,4 +234,27 @@ func (s *SchedulerService) ReportFileProcess(ctx context.Context, req *pb.FilePr
 		return nil, err
 	}
 	return nil, nil
+}
+
+func (s *SchedulerService) DeleteByEtagsAndFields(ctx context.Context, req *pb.DeleteByEtagsAndFieldsRequest) (*emptypb.Empty, error) {
+	recordIds, err := s.modelFileRecordDao.GetIDsByEtagsOrFields(req.Etag, req.Datatype, req.Org, req.Repo, req.Name)
+	if err != nil {
+		return nil, fmt.Errorf("查询recordIds失败: %w", err)
+	}
+
+	if len(recordIds) > 0 && req.InstanceID != "" {
+		_, err := s.modelFileProcessDao.DeleteByRecordIDAndInstanceID(recordIds, req.InstanceID)
+		if err != nil {
+			return nil, fmt.Errorf("删除ModelFileProcess记录失败: %w", err)
+		}
+	}
+
+	if req.InstanceID != "" && req.Datatype != "" && req.Org != "" && req.Repo != "" {
+		_, err := s.repositoryDao.DeleteByInstanceIdAndDatatypeAndOrgAndRepo(req.InstanceID, req.Datatype, req.Org, req.Repo)
+		if err != nil {
+			return nil, fmt.Errorf("删除Repository记录失败: %w", err)
+		}
+	}
+
+	return &emptypb.Empty{}, nil
 }

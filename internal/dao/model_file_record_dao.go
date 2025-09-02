@@ -152,3 +152,35 @@ func (d *ModelFileRecordDao) FindDistinctRepos() ([]string, error) {
 	err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Distinct("org").Find(&orgs).Error
 	return orgs, err
 }
+
+// GetIDsByEtagsOrFields 根据Etag列表查询，或者根据Datatype、Org、Repo、Name四者都匹配的条件查询对应的ID
+func (d *ModelFileRecordDao) GetIDsByEtagsOrFields(etag, datatype, org, repo, name string) ([]int64, error) {
+	var ids []int64
+	query := d.baseData.BizDB.Model(&model.ModelFileRecord{})
+
+	hasEtagCondition := etag != ""
+	hasFieldCondition := datatype != "" && org != "" && repo != "" && name != ""
+
+	if !hasEtagCondition && !hasFieldCondition {
+		return []int64{}, nil
+	}
+
+	if hasEtagCondition {
+		query = query.Where("etag = ?", etag)
+	}
+
+	if hasFieldCondition {
+		condition := "datatype = ? AND org = ? AND repo = ? AND name = ?"
+		if hasEtagCondition {
+			query = query.Or(condition, datatype, org, repo, name)
+		} else {
+			query = query.Where(condition, datatype, org, repo, name)
+		}
+	}
+
+	if err := query.Pluck("id", &ids).Error; err != nil {
+		return nil, fmt.Errorf("查询ID失败: %w", err)
+	}
+
+	return ids, nil
+}
