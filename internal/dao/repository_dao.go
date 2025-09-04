@@ -161,3 +161,18 @@ func paginate(page, pageSize int) (int, int) {
 	offset := (page - 1) * pageSize
 	return offset, pageSize
 }
+
+func (d *RepositoryDao) DeleteByInstanceIdAndDatatypeAndOrgAndRepo(instanceId string, datatype string, org string, repo string) (int64, error) {
+	result := d.baseData.BizDB.Model(&model.Repository{}).
+		Where("instance_id = ?", instanceId).
+		Where("datatype = ?", datatype).
+		Where("org = ?", org).
+		Where("repo = ?", repo).
+		Delete(&model.Repository{})
+
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}

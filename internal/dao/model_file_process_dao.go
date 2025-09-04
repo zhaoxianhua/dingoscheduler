@@ -156,3 +156,15 @@ func (d *ModelFileProcessDao) GetModelFileProcessByCondition(datatype, org, repo
 	}
 	return processes, nil
 }
+
+func (d *ModelFileProcessDao) DeleteByRecordIDAndInstanceID(recordID []int64, instanceID string) (int64, error) {
+	result := d.baseData.BizDB.Model(&model.ModelFileProcess{}).
+		Where("record_id in (?) AND instance_id = ?", recordID, instanceID).
+		Delete(&model.ModelFileProcess{})
+
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	return result.RowsAffected, nil
+}
