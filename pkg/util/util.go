@@ -242,5 +242,9 @@ func ProcessPaths(paths []string) []string {
 }
 
 func GetOrgNameKey(orgName string) string {
-	return fmt.Sprintf("org:%s", orgName)
+	return fmt.Sprintf("org/%s", orgName)
+}
+
+func GetSpeedKey(instanceId string, online bool) string {
+	return fmt.Sprintf("speed/%s/%v", instanceId, online)
 }

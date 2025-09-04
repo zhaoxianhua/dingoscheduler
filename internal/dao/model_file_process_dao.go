@@ -105,9 +105,8 @@ func (d *ModelFileProcessDao) ReportFileProcess(req *pb.FileProcessRequest) erro
 
 func (d *ModelFileProcessDao) GetModelFileProcess(recordId int64) ([]*dto.ModelFileProcessDto, error) {
 	var processes []*dto.ModelFileProcessDto
-	if err := d.baseData.BizDB.Table("model_file_process t1").Select("t1.id, t1.record_id, t1.instance_id, t1.offset_num, t2.host, t2.port, t2.updated_at").
-		Joins("left join dingospeed t2 on t1.instance_id = t2.instance_id").
-		Where("record_id=?", recordId).Order("t1.offset_num, t2.online desc").Find(&processes).Error; err != nil {
+	if err := d.baseData.BizDB.Table("model_file_process t1").Select("t1.id, t1.record_id, t1.instance_id, t1.offset_num").
+		Where("t1.record_id=?", recordId).Order("t1.offset_num desc").Find(&processes).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}

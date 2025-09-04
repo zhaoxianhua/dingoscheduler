@@ -71,12 +71,25 @@ func (d *DingospeedDao) GetEntityById(id int32) (*model.Dingospeed, error) {
 }
 
 func (d *DingospeedDao) GetEntity(instanceId string, online bool) (*model.Dingospeed, error) {
+	// speedKey := util.GetSpeedKey(instanceId, online)
+	// if v, ok := d.baseData.Cache.Get(speedKey); ok {
+	// 	d.baseData.Cache.Set(speedKey, v, config.SysConfig.GetDefaultExpiration())
+	// 	return v.(string), nil
+	// }
+	// mu.Lock()
+	// defer mu.Unlock()
+	// if v, ok := d.baseData.Cache.Get(speedKey); ok {
+	// 	d.baseData.Cache.Set(speedKey, v, config.SysConfig.GetDefaultExpiration())
+	// 	return v.(string), nil
+	// }
 	speeds := make([]model.Dingospeed, 0)
 	if err := d.baseData.BizDB.Table("dingospeed").Where("instance_id = ? and online = ?", instanceId, online).Find(&speeds).Error; err != nil {
 		return nil, err
 	}
 	if len(speeds) > 0 {
-		return &speeds[0], nil
+		speed := &speeds[0]
+		// d.baseData.Cache.Set(speedKey, speed, config.SysConfig.GetDefaultExpiration())
+		return speed, nil
 	}
 	return nil, nil
 }
