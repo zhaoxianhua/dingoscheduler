@@ -17,6 +17,7 @@ type Repository struct {
 	LikeNum       int       `gorm:"column:like_num;not null" json:"like_num"`
 	DownloadNum   int       `gorm:"column:download_num;not null" json:"download_num"`
 	PipelineTagId string    `gorm:"column:pipeline_tag_id;not null" json:"pipeline_tag_id"`
+	PipelineTag   string    `gorm:"column:pipeline_tag;not null" json:"pipeline_tag"`
 	LastModified  string    `gorm:"column:last_modified;not null" json:"last_modified"`
 	UsedStorage   int64     `gorm:"column:used_storage;" json:"used_storage"`
 	Sha           string    `gorm:"column:sha;not null" json:"sha"`

@@ -4,6 +4,7 @@ import (
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
 	modelquery "dingoscheduler/internal/model/query"
+
 	"go.uber.org/zap"
 )
 
@@ -29,7 +30,6 @@ func (d *TagDao) ExistsByID(tagID string) (bool, error) {
 	return count > 0, nil //  count>0表示已存在
 }
 
-// Create 插入新标签到数据库
 func (d *TagDao) Create(tag *model.Tag) error {
 	// 使用GORM的Create方法插入数据
 	if err := d.baseData.BizDB.Table("tag").Create(tag).Error; err != nil {

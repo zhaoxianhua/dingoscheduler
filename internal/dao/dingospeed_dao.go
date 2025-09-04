@@ -33,11 +33,17 @@ func NewDingospeedDao(data *data.BaseData) *DingospeedDao {
 	}
 }
 
-func (d *DingospeedDao) Save(speed *model.Dingospeed) error {
-	if err := d.baseData.BizDB.Model(&model.Dingospeed{}).Save(speed).Error; err != nil {
-		return err
+func (d *DingospeedDao) Save(speed *model.Dingospeed) (int64, error) {
+	insertSql := fmt.Sprintf("INSERT INTO dingospeed(instance_id, host, port, online) VALUES('%s','%s',%d,%v)", speed.InstanceID, speed.Host, speed.Port, speed.Online)
+	db, err := d.baseData.BizDB.DB()
+	if err != nil {
+		return 0, err
 	}
-	return nil
+	result, err := db.Exec(insertSql)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 func (d *DingospeedDao) RegisterUpdate(speed *model.Dingospeed) error {
@@ -65,29 +71,25 @@ func (d *DingospeedDao) GetEntityById(id int32) (*model.Dingospeed, error) {
 }
 
 func (d *DingospeedDao) GetEntity(instanceId string, online bool) (*model.Dingospeed, error) {
+	// speedKey := util.GetSpeedKey(instanceId, online)
+	// if v, ok := d.baseData.Cache.Get(speedKey); ok {
+	// 	d.baseData.Cache.Set(speedKey, v, config.SysConfig.GetDefaultExpiration())
+	// 	return v.(string), nil
+	// }
+	// mu.Lock()
+	// defer mu.Unlock()
+	// if v, ok := d.baseData.Cache.Get(speedKey); ok {
+	// 	d.baseData.Cache.Set(speedKey, v, config.SysConfig.GetDefaultExpiration())
+	// 	return v.(string), nil
+	// }
 	speeds := make([]model.Dingospeed, 0)
-	// sql := fmt.Sprintf("select * from dingospeed where instance_id = '%s' and online = %v limit 1", instanceId, online)
-	// if err := d.baseData.BizDB.Raw(sql).Scan(&speed).Error; err != nil { // [mysql] 2025/07/30 11:18:38 packets.go:68 [warn] unexpected sequence nr: expected 1, got 2
-	// 	if errors.Is(err, gorm.ErrRecordNotFound) {
-	// 		return nil, nil
-	// 	}
-	// 	return nil, err
-	// }
-	// 1个？=》 {"level":"ERROR","time":"2025-07-30 11:25:53","caller":"service/manager_service.go:62","msg":"getEntity err.Error 1105 (HY000): not a literal: ?1"}
-	// 没有？=>{"level":"ERROR","time":"2025-07-30 11:30:21","caller":"service/manager_service.go:62","msg":"getEntity err.Error 1105 (HY000): not a literal: ?0"}
-	// if err := d.baseData.BizDB.Table("dingospeed").Where(fmt.Sprintf("instance_id = '%s'", instanceId)).First(&speed2).Error; err != nil {
-	// var speed model.Dingospeed
-	// if err := d.baseData.BizDB.Table("dingospeed").Where("instance_id = ? and online = ?", instanceId, online).First(&speed).Error; err != nil {
-	// 	if errors.Is(err, gorm.ErrRecordNotFound) {
-	// 		return nil, nil
-	// 	}
-	// 	return nil, err
-	// }
 	if err := d.baseData.BizDB.Table("dingospeed").Where("instance_id = ? and online = ?", instanceId, online).Find(&speeds).Error; err != nil {
 		return nil, err
 	}
 	if len(speeds) > 0 {
-		return &speeds[0], nil
+		speed := &speeds[0]
+		// d.baseData.Cache.Set(speedKey, speed, config.SysConfig.GetDefaultExpiration())
+		return speed, nil
 	}
 	return nil, nil
 }

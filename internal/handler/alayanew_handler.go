@@ -11,6 +11,7 @@ import (
 	"dingoscheduler/pkg/util"
 
 	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 )
 
 type AlayanewHandler struct {
@@ -28,39 +29,50 @@ func NewAlayanewHandler(repositoryService *service.RepositoryService, tagService
 func (handler *AlayanewHandler) RepositoriesHandler(c echo.Context) error {
 	name := c.QueryParam("name")
 	instanceId := c.QueryParam("instanceId")
-	page, _ := strconv.Atoi(c.QueryParam("page"))
-	if page < 1 {
-		page = 1
+	var (
+		page, pageSize int
+		err            error
+	)
+	if page, err = extractPageParam(c, "page"); err != nil {
+		return util.ErrorRequestParam(c)
 	}
-	pageSize, _ := strconv.Atoi(c.QueryParam("pageSize"))
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
+	if pageSize, err = extractPageParam(c, "pageSize"); err != nil {
+		return util.ErrorRequestParam(c)
 	}
-	sortBy := c.QueryParam("sort")
-	if sortBy == "" {
-		sortBy = "last_modified"
-	}
-	sortDir := c.QueryParam("order")
-	if sortDir == "" {
-		sortDir = "desc"
-	}
+	sortBy := extractStringParam(c, "sort", "last_modified")
+	sortDir := extractStringParam(c, "order", "desc")
 	sortDir = strings.ToLower(sortDir)
 	if sortDir != "asc" && sortDir != "desc" {
 		return util.ErrorRequestParam(c)
 	}
+	pipelineTag := c.QueryParam("pipeline_tag")
+	library := c.QueryParam("library")
+	apps := c.QueryParam("apps")
+	inferenceProvider := c.QueryParam("inference_provider")
+	language := c.QueryParam("language")
+	license := c.QueryParam("license")
+	other := c.QueryParam("other")
 	models, total, err := handler.repositoryService.RepositoryList(&query.ModelQuery{
-		InstanceId: instanceId,
-		Name:       name,
-		Page:       page,
-		PageSize:   pageSize,
-		Sort:       sortBy,
-		Order:      sortDir,
+		InstanceId:        instanceId,
+		Name:              name,
+		Page:              page,
+		PageSize:          pageSize,
+		Sort:              sortBy,
+		Order:             sortDir,
+		PipelineTag:       pipelineTag,
+		Library:           library,
+		Apps:              apps,
+		InferenceProvider: inferenceProvider,
+		Language:          language,
+		License:           license,
+		Other:             other,
 	})
 	if err != nil {
+		zap.S().Errorf("RepositoryList err.%v", err)
 		if e, ok := err.(myerr.Error); ok {
-			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
+			return util.ErrorEntryUnknown(c, e.StatusCode(), err.Error())
 		}
-		return util.ResponseError(c, err)
+		return util.ResponseError(c)
 	}
 	return util.ResponseData(c, util.PageData{
 		Total: total,
@@ -68,28 +80,61 @@ func (handler *AlayanewHandler) RepositoriesHandler(c echo.Context) error {
 	})
 }
 
+func extractPageParam(c echo.Context, pageParamName string) (int, error) {
+	pageStr := c.QueryParam(pageParamName)
+	if pageStr == "" {
+		pageStr = "0"
+	}
+	page, err := strconv.Atoi(pageStr)
+	if err != nil {
+		zap.S().Errorf("param conv err.%v", err)
+		return 0, util.ErrorRequestParam(c)
+	}
+	return page, nil
+}
+
+func extractStringParam(c echo.Context, pageParamName, defaultValue string) string {
+	value := c.QueryParam(pageParamName)
+	if value == "" {
+		value = defaultValue
+	}
+	return value
+}
+
 func (handler *AlayanewHandler) RepositoryInfoHandler(c echo.Context) error {
 	id := util.Atoi64(c.Param("id"))
 	model, err := handler.repositoryService.GetRepositoryById(id)
 	if err != nil {
+		zap.S().Errorf("GetRepositoryById err.%v", err)
 		if e, ok := err.(myerr.Error); ok {
 			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
 		}
-		return util.ResponseError(c, err)
+		return util.ResponseError(c)
 	}
 	return util.ResponseData(c, model)
 }
 
 func (handler *AlayanewHandler) RepositoryCardHandler(c echo.Context) error {
+	instanceId := c.Param("instanceId")
 	id := util.Atoi64(c.Param("id"))
-	model, err := handler.repositoryService.RepositoryCardById(id)
+	err := handler.repositoryService.RepositoryCardById(c, instanceId, id)
 	if err != nil {
-		if e, ok := err.(myerr.Error); ok {
-			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
-		}
-		return util.ResponseError(c, err)
+		zap.S().Errorf("GetRepositoryById err.%v", err)
+		return util.ResponseError(c)
 	}
-	return util.ResponseData(c, model)
+	return nil
+}
+
+func (handler *AlayanewHandler) RepositoryFilesHandler(c echo.Context) error {
+	instanceId := c.Param("instanceId")
+	id := util.Atoi64(c.Param("id"))
+	filePath := c.Param("filePath")
+	err := handler.repositoryService.RepositoryFilesById(c, instanceId, id, filePath)
+	if err != nil {
+		zap.S().Errorf("GetRepositoryById err.%v", err)
+		return util.ResponseError(c)
+	}
+	return nil
 }
 
 func (handler *AlayanewHandler) TagHandler(c echo.Context) error {

@@ -55,7 +55,10 @@ func (r *HttpRouter) initRouter() {
 
 	r.echo.GET("/api/v1/repositories", r.alayanewHandler.RepositoriesHandler)
 	r.echo.GET("/api/v1/repository/:id", r.alayanewHandler.RepositoryInfoHandler)
-	r.echo.GET("/api/v1/repository/card/:id", r.alayanewHandler.RepositoryCardHandler)
+	r.echo.GET("/api/v1/repository/card/:instanceId/:id", r.alayanewHandler.RepositoryCardHandler)
+
+	r.echo.GET("/api/v1/repository/files/:instanceId/:id", r.alayanewHandler.RepositoryFilesHandler)
+	r.echo.GET("/api/v1/repository/files/:instanceId/:id/:filePath", r.alayanewHandler.RepositoryFilesHandler)
 
 	r.echo.GET("/api/v1/tags", r.alayanewHandler.TagHandler)
 	r.echo.GET("/api/v1/task_tags", r.alayanewHandler.TaskTagHandler)

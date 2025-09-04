@@ -19,6 +19,7 @@ import (
 
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
+	"dingoscheduler/internal/model/dto"
 	"dingoscheduler/internal/model/query"
 
 	"go.uber.org/zap"
@@ -26,25 +27,35 @@ import (
 )
 
 type RepositoryDao struct {
-	baseData *data.BaseData
+	baseData         *data.BaseData
+	repositoryTagDao *RepositoryTagDao
 }
 
-func NewRepositoryDao(data *data.BaseData) *RepositoryDao {
+func NewRepositoryDao(data *data.BaseData, repositoryTagDao *RepositoryTagDao) *RepositoryDao {
 	return &RepositoryDao{
-		baseData: data,
+		baseData:         data,
+		repositoryTagDao: repositoryTagDao,
 	}
 }
 
-func (d *RepositoryDao) Save(repository *model.Repository) error {
-	if err := d.baseData.BizDB.Model(&model.Repository{}).Save(repository).Error; err != nil {
-		return err
+func (r *RepositoryDao) SaveBySql(tx *gorm.DB, repo *model.Repository) (int64, error) {
+	recordSql := fmt.Sprintf("INSERT INTO repository (instance_id, datatype, org, repo, org_repo, like_num, download_num, pipeline_tag_id, pipeline_tag, last_modified, used_storage, sha)"+
+		" VALUES( '%s', '%s', '%s', '%s', '%s', %d, %d, '%s', '%s', '%s', %d, '%s')",
+		repo.InstanceId, repo.Datatype, repo.Org, repo.Repo, repo.OrgRepo, repo.LikeNum, repo.DownloadNum, repo.PipelineTagId, repo.PipelineTag, repo.LastModified, repo.UsedStorage, repo.Sha)
+	db, err := tx.DB()
+	if err != nil {
+		return 0, err
 	}
-	return nil
+	result, err := db.Exec(recordSql)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
-func (d *RepositoryDao) Get(id int64) (*model.Repository, error) {
+func (r *RepositoryDao) Get(id int64) (*model.Repository, error) {
 	var repository []*model.Repository
-	if err := d.baseData.BizDB.Model(&model.Repository{}).Select("id, org_repo,like_num, download_num, pipeline_tag_id,last_modified ").Where("id = ?", id).Find(&repository).Error; err != nil {
+	if err := r.baseData.BizDB.Model(&model.Repository{}).Select("id, org, org_repo,like_num, download_num, pipeline_tag,last_modified,sha ").Where("id = ?", id).Find(&repository).Error; err != nil {
 		return nil, err
 	}
 	if len(repository) > 0 {
@@ -53,15 +64,16 @@ func (d *RepositoryDao) Get(id int64) (*model.Repository, error) {
 	return nil, fmt.Errorf("No record found")
 }
 
-func (d *RepositoryDao) RepoAndTagSave(repository *model.Repository, tags []*model.RepositoryTag) error {
-	if err := d.baseData.BizDB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(repository).Error; err != nil {
+func (r *RepositoryDao) RepoAndTagSave(repository *model.Repository, tags []*model.RepositoryTag) error {
+	if err := r.baseData.BizDB.Transaction(func(tx *gorm.DB) error {
+		lastId, err := r.SaveBySql(tx, repository)
+		if err != nil {
 			return err
 		}
 		for i := range tags {
-			tags[i].RepoId = repository.ID
+			tags[i].RepoId = lastId
 		}
-		if err := tx.Create(tags).Error; err != nil {
+		if err = r.repositoryTagDao.BatchSave(tx, tags); err != nil {
 			return err
 		}
 		return nil
@@ -72,21 +84,53 @@ func (d *RepositoryDao) RepoAndTagSave(repository *model.Repository, tags []*mod
 	return nil
 }
 
-func (d *RepositoryDao) GetFreeRepository(instanceId string) ([]*model.Repository, error) {
+func (r *RepositoryDao) GetFreeRepository(instanceId string) ([]*model.Repository, error) {
 	var repositories []*model.Repository
-	err := d.baseData.BizDB.Table("model_file_record t1").Select("distinct t1.datatype, t1.org, t1.repo ").
+	err := r.baseData.BizDB.Table("model_file_record t1").Select("distinct t1.datatype, t1.org, t1.repo ").
 		Where(" t1.id in (SELECT x.record_id FROM dingo.model_file_process x where x.instance_id = ?) and t1.repo not in (select repo from repository where instance_id = ?)", instanceId, instanceId).Find(&repositories).Error
 	return repositories, err
 }
 
-func (d *RepositoryDao) ModelList(query *query.ModelQuery) ([]*model.Repository, int64, error) {
-	var repositories []*model.Repository
-	db := d.baseData.BizDB.Model(&model.Repository{}).Select("id, org_repo,like_num, download_num, pipeline_tag_id,last_modified ")
+func (r *RepositoryDao) VerifyRepoComplete(instanceId, datatype, org, repo string) (int64, error) {
+	var recordCount int64
+	err := r.baseData.BizDB.Table("model_file_record t1").Select("t1.id").InnerJoins(", model_file_process t2").
+		Where("t1.datatype = ? and t1.org=? and t1.repo= ? and t1.id = t2.record_id and t2.instance_id = ? and t1.file_size = t2.offset_num", datatype, org, repo, instanceId).Count(&recordCount).Error
+	return recordCount, err
+}
+
+func (r *RepositoryDao) ModelList(query *query.ModelQuery) ([]*dto.Repository, int64, error) {
+	var repositories []*dto.Repository
+	db := r.baseData.BizDB.Table("repository t1").Select("t1.id, t1.org, t1.org_repo, t1.like_num, t1.download_num, t1.pipeline_tag, t1.last_modified ")
 	if query.InstanceId != "" {
-		db.Where("instance_id = ?", query.InstanceId)
+		db.Where("t1.instance_id = ?", query.InstanceId)
 	}
 	if query.Name != "" {
-		db.Where(fmt.Sprintf("org_repo like '%s'", "%"+query.Name+"%"))
+		db.Where(fmt.Sprintf("t1.org_repo like '%s'", "%"+query.Name+"%"))
+	}
+	if query.PipelineTag != "" {
+		db.Where("t1.pipeline_tag_id = ?", query.PipelineTag)
+	}
+	tags := make([]string, 0)
+	if query.Library != "" {
+		tags = append(tags, query.Library)
+	}
+	if query.Apps != "" {
+		tags = append(tags, query.Apps)
+	}
+	if query.InferenceProvider != "" {
+		tags = append(tags, query.InferenceProvider)
+	}
+	if query.Language != "" {
+		tags = append(tags, query.Language)
+	}
+	if query.License != "" {
+		tags = append(tags, query.License)
+	}
+	if query.Other != "" {
+		tags = append(tags, query.Other)
+	}
+	if len(tags) > 0 {
+		db.Where(" t1.id in (select repo_id from repository_tag where tag_id in (?))", tags)
 	}
 	var count int64
 	if err := db.Count(&count).Error; err != nil {

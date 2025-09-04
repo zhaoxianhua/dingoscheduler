@@ -16,9 +16,9 @@ package service
 
 import (
 	"fmt"
+	"io"
 	"net/http"
-	"path/filepath"
-	"strings"
+	"net/url"
 
 	"dingoscheduler/internal/dao"
 	"dingoscheduler/internal/model"
@@ -37,22 +37,36 @@ type RepositoryService struct {
 	dingospeedDao       *dao.DingospeedDao
 	modelFileProcessDao *dao.ModelFileProcessDao
 	repositoryDao       *dao.RepositoryDao
+	organizationDao     *dao.OrganizationDao
 	tagDao              *dao.TagDao
+	client              *http.Client
 }
 
 func NewRepositoryService(dingospeedDao *dao.DingospeedDao, modelFileProcessDao *dao.ModelFileProcessDao,
-	repositoryDao *dao.RepositoryDao, tagDao *dao.TagDao) *RepositoryService {
+	repositoryDao *dao.RepositoryDao, tagDao *dao.TagDao, organizationDao *dao.OrganizationDao) *RepositoryService {
 	return &RepositoryService{
 		dingospeedDao:       dingospeedDao,
 		repositoryDao:       repositoryDao,
 		modelFileProcessDao: modelFileProcessDao,
 		tagDao:              tagDao,
+		organizationDao:     organizationDao,
+		client:              &http.Client{},
 	}
 }
 
-func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepoQuery) error {
-	zap.S().Debugf("PersistRepo instanceId:%s", query.InstanceIds)
-	for _, instanceId := range query.InstanceIds {
+func (s *RepositoryService) PersistRepo(c echo.Context, repoQuery *query.PersistRepoQuery) error {
+	zap.S().Debugf("PersistRepo instanceId:%s", repoQuery.InstanceIds)
+	pipelineTags, err := s.tagDao.TagListByCondition(&query.TagQuery{
+		Types: []string{"pipeline_tag"},
+	})
+	if err != nil {
+		return err
+	}
+	pipelineMap := make(map[string]string, 0)
+	for _, item := range pipelineTags {
+		pipelineMap[item.ID] = item.Label
+	}
+	for _, instanceId := range repoQuery.InstanceIds {
 		// 存在下载记录和进度，但模型在仓库不存在。
 		freeRepositories, err := s.repositoryDao.GetFreeRepository(instanceId)
 		if err != nil {
@@ -71,7 +85,7 @@ func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepo
 			}
 			speedDomain := fmt.Sprintf("http://%s:%d", entity.Host, entity.Port)
 			orgRepo := util.GetOrgRepo(repository.Org, repository.Repo)
-			resp, err := s.dingospeedDao.RemoteRequestMeta(speedDomain, repository.Datatype, orgRepo, "main", query.Token)
+			resp, err := s.dingospeedDao.RemoteRequestMeta(speedDomain, repository.Datatype, orgRepo, "main", repoQuery.Token)
 			if err != nil {
 				return err
 			}
@@ -84,7 +98,13 @@ func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepo
 				return err
 			}
 			// 根据当前版本的元数据与下载进度、进度比较，只将完整的模型做保存。
-			// todo
+			isComplete, err := s.verifyRepoComplete(&metaData, instanceId, repository.Datatype, repository.Org, repository.Repo)
+			if err != nil {
+				return err
+			}
+			if !isComplete {
+				continue
+			}
 			repo := &model.Repository{
 				InstanceId:    instanceId,
 				Datatype:      repository.Datatype,
@@ -94,6 +114,7 @@ func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepo
 				LikeNum:       metaData.Likes,
 				DownloadNum:   metaData.Downloads,
 				PipelineTagId: metaData.PipelineTag,
+				PipelineTag:   pipelineMap[metaData.PipelineTag],
 				LastModified:  metaData.LastModified,
 				UsedStorage:   metaData.UsedStorage,
 				Sha:           metaData.Sha,
@@ -114,14 +135,31 @@ func (s *RepositoryService) PersistRepo(c echo.Context, query *query.PersistRepo
 	return nil
 }
 
+func (s *RepositoryService) verifyRepoComplete(metaData *dto.CommitHfSha, instanceId, datatype, org, repo string) (bool, error) {
+	size, err := s.repositoryDao.VerifyRepoComplete(instanceId, datatype, org, repo)
+	if err != nil {
+		return false, err
+	}
+	fileCount := len(metaData.Siblings)
+	if size >= int64(fileCount) {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (s *RepositoryService) RepositoryList(query *query.ModelQuery) ([]*dto.Repository, int64, error) {
 	repositories, size, err := s.repositoryDao.ModelList(query)
 	if err != nil {
 		return nil, 0, err
 	}
-	repos := make([]*dto.Repository, 0)
-	gocopy.Copy(&repos, &repositories)
-	return repos, size, nil
+	for _, repo := range repositories {
+		if icon, err := s.organizationDao.GetOrganization(repo.Org); err != nil {
+			return nil, 0, err
+		} else {
+			repo.Icon = icon
+		}
+	}
+	return repositories, size, nil
 }
 
 func (s *RepositoryService) GetRepositoryById(id int64) (*dto.Repository, error) {
@@ -138,34 +176,97 @@ func (s *RepositoryService) GetRepositoryById(id int64) (*dto.Repository, error)
 	for _, tag := range tags {
 		repo.Tags = append(repo.Tags, tag.Label)
 	}
+	if icon, err := s.organizationDao.GetOrganization(repository.Org); err != nil {
+		return nil, err
+	} else {
+		repo.Icon = icon
+	}
 	return &repo, nil
 }
 
-func (s *RepositoryService) RepositoryCardById(id int64) (*dto.Repository, error) {
+func (s *RepositoryService) RepositoryCardById(c echo.Context, instanceId string, id int64) error {
+	targetURL, repository, err := s.getRepository(instanceId, id)
+	if err != nil {
+		return err
+	}
+	forwardURL := fmt.Sprintf("%s/models/%s/resolve/%s/README.md", targetURL.String(), repository.OrgRepo, repository.Sha)
+	resp, err := s.requestForward(c, targetURL, forwardURL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	for key, values := range resp.Header {
+		for _, value := range values {
+			c.Response().Header().Add(key, value)
+		}
+	}
+	c.Response().WriteHeader(resp.StatusCode)
+	if _, err := io.Copy(c.Response().Writer, resp.Body); err != nil {
+		return fmt.Errorf("响应内容回传失败")
+	}
+	return nil
+}
+
+func (s *RepositoryService) RepositoryFilesById(c echo.Context, instanceId string, id int64, filePath string) error {
+	targetURL, repository, err := s.getRepository(instanceId, id)
+	if err != nil {
+		return err
+	}
+	forwardURL := fmt.Sprintf("%s/api/models/%s/files/%s", targetURL.String(), repository.OrgRepo, repository.Sha)
+	if filePath != "" {
+		forwardURL += fmt.Sprintf("/%s", filePath)
+	}
+	resp, err := s.requestForward(c, targetURL, forwardURL)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	for key, values := range resp.Header {
+		for _, value := range values {
+			c.Response().Header().Add(key, value)
+		}
+	}
+	c.Response().WriteHeader(resp.StatusCode)
+	if _, err := io.Copy(c.Response().Writer, resp.Body); err != nil {
+		return fmt.Errorf("响应内容回传失败")
+	}
+	return nil
+}
+
+func (s *RepositoryService) getRepository(instanceId string, id int64) (*url.URL, *model.Repository, error) {
+	entity, err := s.dingospeedDao.GetEntity(instanceId, true)
+	if err != nil {
+		return nil, nil, fmt.Errorf("GetEntity err")
+	}
+	if entity == nil {
+		return nil, nil, fmt.Errorf("该区域dingspeed未注册。")
+	}
 	repository, err := s.repositoryDao.Get(id)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("repositoryDao get err")
 	}
-	var repo dto.Repository
-	gocopy.Copy(&repo, &repository)
-	tags, err := s.tagDao.GetTagByRepoId(id)
+	speedDomain := fmt.Sprintf("http://%s:%d", entity.Host, entity.Port)
+	targetURL, err := url.Parse(speedDomain)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("目标服务URL解析失败")
 	}
-	for _, tag := range tags {
-		repo.Tags = append(repo.Tags, tag.Label)
-	}
-	return &repo, nil
+	return targetURL, repository, nil
 }
 
-func (s *RepositoryService) constructFileDir(path string) (*dto.FileDescribe, error) {
-	parts := strings.Split(path, string(filepath.Separator))
-	if len(parts) == 0 {
-		return nil, nil
+func (s *RepositoryService) requestForward(c echo.Context, targetURL *url.URL, forwardURL string) (*http.Response, error) {
+	req, err := http.NewRequest(c.Request().Method, forwardURL, c.Request().Body)
+	if err != nil {
+		return nil, fmt.Errorf("创建转发请求失败")
 	}
-	isDir := len(parts) > 1
-	return &dto.FileDescribe{
-		Name:  parts[0],
-		IsDir: isDir,
-	}, nil
+	for key, values := range c.Request().Header {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
+	req.Host = targetURL.Host
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("转发请求到目标服务失败")
+	}
+	return resp, nil
 }

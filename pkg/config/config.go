@@ -17,6 +17,7 @@ package config
 import (
 	"errors"
 	"os"
+	"time"
 
 	"dingoscheduler/internal/model"
 
@@ -32,6 +33,7 @@ var SystemInfo *model.SystemInfo
 type Config struct {
 	Server      ServerConfig `json:"server" yaml:"server"`
 	BizDBConfig DBConfig     `json:"bizDB" yaml:"bizDB"`
+	Cache       Cache        `json:"cache" yaml:"cache"`
 	Scheduler   Scheduler    `json:"scheduler" yaml:"scheduler"`
 	Retry       Retry        `json:"retry" yaml:"retry"`
 	Log         LogConfig    `json:"log" yaml:"log"`
@@ -69,6 +71,10 @@ type LogConfig struct {
 
 type Avatar struct {
 	Path string `yaml:"path"`
+}
+type Cache struct {
+	DefaultExpiration int `json:"defaultExpiration" yaml:"defaultExpiration" `
+	CleanupInterval   int `json:"cleanupInterval" yaml:"cleanupInterval"`
 }
 
 type Oss struct {
@@ -112,6 +118,20 @@ func (c *Config) SetDefaults() {
 		c.Server.PProfPort = 6060
 	}
 	c.Server.Ssl.EnableCA = true
+}
+
+func (c *Config) GetDefaultExpiration() time.Duration {
+	if c.Cache.DefaultExpiration == 0 {
+		c.Cache.DefaultExpiration = 5
+	}
+	return time.Duration(c.Cache.DefaultExpiration) * time.Hour
+}
+
+func (c *Config) GetCleanupInterval() time.Duration {
+	if c.Cache.CleanupInterval == 0 {
+		c.Cache.CleanupInterval = 10
+	}
+	return time.Duration(c.Cache.CleanupInterval) * time.Hour
 }
 
 func Scan(path string) (*Config, error) {

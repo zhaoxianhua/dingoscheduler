@@ -126,7 +126,7 @@ func main() {
 			Icon: onlyFileName,
 		}
 
-		if err := organizationDao.Insert(org); err != nil {
+		if err := organizationDao.SaveOrgBySql(org); err != nil {
 			zap.S().Errorf("处理repo [%s] 失败：插入organization表错误，%v，跳过", repo, err)
 			continue
 		}

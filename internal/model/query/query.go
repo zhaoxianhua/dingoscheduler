@@ -32,12 +32,19 @@ type PersistRepoQuery struct {
 }
 
 type ModelQuery struct {
-	InstanceId string `json:"instanceId"`
-	Name       string
-	Page       int
-	PageSize   int
-	Sort       string
-	Order      string
+	InstanceId        string `json:"instanceId"`
+	Name              string
+	Page              int
+	PageSize          int
+	Sort              string
+	Order             string
+	PipelineTag       string
+	Library           string
+	Apps              string
+	InferenceProvider string
+	Language          string
+	License           string
+	Other             string
 }
 
 type TagQuery struct {

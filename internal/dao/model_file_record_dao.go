@@ -36,18 +36,41 @@ func NewModelFileRecordDao(data *data.BaseData) *ModelFileRecordDao {
 	}
 }
 
-func (d *ModelFileRecordDao) Save(records *model.ModelFileRecord) error {
-	if err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Save(records).Error; err != nil {
+func (d *ModelFileRecordDao) BatchSave(records []model.ModelFileRecord) error {
+	tx := d.baseData.BizDB.Begin()
+	if tx.Error != nil {
+		zap.S().Error("开启事务失败: %v", tx.Error)
+		return tx.Error
+	}
+	sql := "INSERT INTO model_file_record(datatype, org, repo, name, etag, file_size)VALUES(?,?,?,?,?,?)"
+	for _, record := range records {
+		result := tx.Exec(sql, record.Datatype, record.Org, record.Repo, record.Name, record.Etag, record.FileSize)
+		if result.Error != nil {
+			// 出错回滚事务
+			tx.Rollback()
+			zap.S().Error("批量插入失败: %v", result.Error)
+			return result.Error
+		}
+	}
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		zap.S().Fatalf("事务提交失败: %v", err)
 		return err
 	}
 	return nil
 }
 
-func (d *ModelFileRecordDao) BatchSave(records []model.ModelFileRecord) error {
-	if err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).CreateInBatches(&records, 5).Error; err != nil {
-		return err
+func SaveRecordBySql(tx *gorm.DB, record *model.ModelFileRecord) (int64, error) {
+	recordSql := fmt.Sprintf("INSERT INTO model_file_record(datatype, org, repo, name, etag, file_size) VALUES ('%s','%s','%s','%s','%s',%d)", record.Datatype, record.Org, record.Repo, record.Name, record.Etag, record.FileSize)
+	db, err := tx.DB()
+	if err != nil {
+		return 0, err
 	}
-	return nil
+	result, err := db.Exec(recordSql)
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecordQuery) (*model.ModelFileRecord, error) {
@@ -75,7 +98,8 @@ func (d *ModelFileRecordDao) GetModelFileRecord(condition *query.ModelFileRecord
 	return nil, nil
 }
 
-func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, process *model.ModelFileProcess) error {
+func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, process *model.ModelFileProcess) (int64, error) {
+	var processId int64
 	if err := d.baseData.BizDB.Transaction(func(tx *gorm.DB) error {
 		record := &model.ModelFileRecord{
 			Datatype: req.DataType,
@@ -85,20 +109,22 @@ func (d *ModelFileRecordDao) SaveSchedulerRecord(req *pb.SchedulerFileRequest, p
 			Etag:     req.Etag,
 			FileSize: req.FileSize,
 		}
-		if err := tx.Create(record).Error; err != nil {
+		lastId, err := SaveRecordBySql(tx, record)
+		if err != nil {
 			return err
 		}
-		process.RecordID = record.ID
+		process.RecordID = lastId
 		process.OffsetNum = 0 // 初始
-		if err := tx.Create(process).Error; err != nil {
+		processId, err = SaveProcessBySql(tx, process)
+		if err != nil {
 			return err
 		}
 		return nil
 	}); err != nil {
-		zap.S().Error("SaveSchedulerRecord err.%v", err)
-		return err
+		zap.S().Errorf("SaveSchedulerRecord err.%v", err)
+		return 0, err
 	}
-	return nil
+	return processId, nil
 }
 
 // ExistEtags 查询指定Etag列表中已存在的Etag
