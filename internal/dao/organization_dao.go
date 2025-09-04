@@ -3,6 +3,7 @@ package dao
 import (
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
+	"go.uber.org/zap"
 )
 
 type OrganizationDao struct {
@@ -28,4 +29,14 @@ func (d *OrganizationDao) Insert(org *model.Organization) error {
 
 func (d *OrganizationDao) UpdateByField(field, value string, org *model.Organization) error {
 	return d.baseData.BizDB.Table("organization").Where(field+" = ?", value).Updates(org).Error
+}
+
+func (d *OrganizationDao) FindAllNames() ([]string, error) {
+	var names []string
+	err := d.baseData.BizDB.Table("organization").Pluck("name", &names).Error
+	if err != nil {
+		zap.S().Errorf("查询organization表name字段失败：%v", err)
+		return nil, err
+	}
+	return names, nil
 }

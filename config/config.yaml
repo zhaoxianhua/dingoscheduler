@@ -46,3 +46,8 @@ log:
 
 avatar:
     path: ./avatar
+
+oss:
+    bucketName: "alayanew"
+    region: "cn-beijing"
+    path: "https://s1.alayanew.com/assets/static/bp/model/"
