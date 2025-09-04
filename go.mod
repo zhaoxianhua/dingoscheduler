@@ -15,6 +15,7 @@ require (
 	github.com/klauspost/compress v1.18.0
 	github.com/labstack/echo/v4 v4.13.3
 	github.com/labstack/gommon v0.4.2
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.22.0
 	github.com/young2j/gocopy v1.1.14
 	go.uber.org/zap v1.24.0

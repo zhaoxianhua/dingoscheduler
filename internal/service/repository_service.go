@@ -37,17 +37,19 @@ type RepositoryService struct {
 	dingospeedDao       *dao.DingospeedDao
 	modelFileProcessDao *dao.ModelFileProcessDao
 	repositoryDao       *dao.RepositoryDao
+	organizationDao     *dao.OrganizationDao
 	tagDao              *dao.TagDao
 	client              *http.Client
 }
 
 func NewRepositoryService(dingospeedDao *dao.DingospeedDao, modelFileProcessDao *dao.ModelFileProcessDao,
-	repositoryDao *dao.RepositoryDao, tagDao *dao.TagDao) *RepositoryService {
+	repositoryDao *dao.RepositoryDao, tagDao *dao.TagDao, organizationDao *dao.OrganizationDao) *RepositoryService {
 	return &RepositoryService{
 		dingospeedDao:       dingospeedDao,
 		repositoryDao:       repositoryDao,
 		modelFileProcessDao: modelFileProcessDao,
 		tagDao:              tagDao,
+		organizationDao:     organizationDao,
 		client:              &http.Client{},
 	}
 }
@@ -96,7 +98,13 @@ func (s *RepositoryService) PersistRepo(c echo.Context, repoQuery *query.Persist
 				return err
 			}
 			// 根据当前版本的元数据与下载进度、进度比较，只将完整的模型做保存。
-			// todo
+			isComplete, err := s.verifyRepoComplete(&metaData, instanceId, repository.Datatype, repository.Org, repository.Repo)
+			if err != nil {
+				return err
+			}
+			if !isComplete {
+				continue
+			}
 			repo := &model.Repository{
 				InstanceId:    instanceId,
 				Datatype:      repository.Datatype,
@@ -127,14 +135,31 @@ func (s *RepositoryService) PersistRepo(c echo.Context, repoQuery *query.Persist
 	return nil
 }
 
+func (s *RepositoryService) verifyRepoComplete(metaData *dto.CommitHfSha, instanceId, datatype, org, repo string) (bool, error) {
+	size, err := s.repositoryDao.VerifyRepoComplete(instanceId, datatype, org, repo)
+	if err != nil {
+		return false, err
+	}
+	fileCount := len(metaData.Siblings)
+	if size >= int64(fileCount) {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (s *RepositoryService) RepositoryList(query *query.ModelQuery) ([]*dto.Repository, int64, error) {
 	repositories, size, err := s.repositoryDao.ModelList(query)
 	if err != nil {
 		return nil, 0, err
 	}
-	repos := make([]*dto.Repository, 0)
-	gocopy.Copy(&repos, &repositories)
-	return repos, size, nil
+	for _, repo := range repositories {
+		if icon, err := s.organizationDao.GetOrganization(repo.Org); err != nil {
+			return nil, 0, err
+		} else {
+			repo.Icon = icon
+		}
+	}
+	return repositories, size, nil
 }
 
 func (s *RepositoryService) GetRepositoryById(id int64) (*dto.Repository, error) {
@@ -150,6 +175,11 @@ func (s *RepositoryService) GetRepositoryById(id int64) (*dto.Repository, error)
 	}
 	for _, tag := range tags {
 		repo.Tags = append(repo.Tags, tag.Label)
+	}
+	if icon, err := s.organizationDao.GetOrganization(repository.Org); err != nil {
+		return nil, err
+	} else {
+		repo.Icon = icon
 	}
 	return &repo, nil
 }
