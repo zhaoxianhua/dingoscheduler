@@ -13,6 +13,7 @@ type GroupedTagDTO struct {
 }
 
 type GroupedByTypeDTO struct {
-	Type string `json:"type"` // 分组的类型
-	Tags []*Tag `json:"tags"` // 该类型下的所有标签
+	Type     string `json:"type"` // 分组的类型
+	Tags     []*Tag `json:"tags"` // 该类型下的所有标签
+	TotalNum int    `json:"totalNum"`
 }

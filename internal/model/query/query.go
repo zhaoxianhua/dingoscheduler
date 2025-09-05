@@ -48,6 +48,7 @@ type ModelQuery struct {
 }
 
 type TagQuery struct {
+	Id       string
 	Types    []string
 	SubTypes []string
 	Labels   []string

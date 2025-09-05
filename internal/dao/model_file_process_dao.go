@@ -62,21 +62,40 @@ func (d *ModelFileProcessDao) BatchSave(processes []model.ModelFileProcess) erro
 		zap.S().Error("开启事务失败: %v", tx.Error)
 		return tx.Error
 	}
-	sql := "INSERT INTO model_file_process(record_id, instance_id, offset_num, status, master_instance_id) VALUES(?,?,?,?,?)"
-	for _, process := range processes {
-		result := tx.Exec(sql, process.RecordID, process.InstanceID, process.OffsetNum, process.Status, process.MasterInstanceID)
-		if result.Error != nil {
-			// 出错回滚事务
-			tx.Rollback()
-			zap.S().Error("批量插入失败: %v", result.Error)
-			return result.Error
-		}
+
+	db, err := tx.DB()
+	if err != nil {
+		tx.Rollback()
+		zap.S().Error("从事务获取 DB 实例失败: %v", err)
+		return err
 	}
+
+	for _, process := range processes {
+		sql := fmt.Sprintf(
+			"INSERT INTO model_file_process(record_id, instance_id, offset_num, status, master_instance_id) VALUES(%d,'%s',%d,%d,'%s')",
+			process.RecordID,
+			process.InstanceID,
+			process.OffsetNum,
+			process.Status,
+			process.MasterInstanceID,
+		)
+
+		result, err := db.Exec(sql)
+		if err != nil {
+			tx.Rollback()
+			zap.S().Error("批量插入失败: %v, SQL: %s", err, sql)
+			return err
+		}
+
+		_, _ = result.LastInsertId()
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		tx.Rollback()
 		zap.S().Fatalf("事务提交失败: %v", err)
 		return err
 	}
+
 	return nil
 }
 

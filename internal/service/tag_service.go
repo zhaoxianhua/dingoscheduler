@@ -106,11 +106,11 @@ func (t *TagService) TaskTagList(query *query.TagQuery) ([]*dto.GroupedTagDTO, e
 }
 
 func (t *TagService) MainTagList() ([]*dto.GroupedByTypeDTO, error) {
-	condition := &query.TagQuery{
+	listCondition := &query.TagQuery{
 		Labels: targetLabels,
 	}
 
-	tags, err := t.tagDao.TagListByCondition(condition)
+	tags, err := t.tagDao.TagListByCondition(listCondition)
 	if err != nil {
 		return nil, err
 	}
@@ -125,14 +125,24 @@ func (t *TagService) MainTagList() ([]*dto.GroupedByTypeDTO, error) {
 
 	result := make([]*dto.GroupedByTypeDTO, 0, len(groupMap))
 	for typ, tagsInGroup := range groupMap {
+		countCondition := &query.TagQuery{
+			Types: []string{typ},
+		}
+
+		totalCount, err := t.tagDao.TagCountByCondition(countCondition)
+		if err != nil {
+			return nil, err
+		}
+
 		mappedType, exists := typeMapping[typ]
 		if !exists {
 			mappedType = typ
 		}
 
 		result = append(result, &dto.GroupedByTypeDTO{
-			Type: mappedType,
-			Tags: tagsInGroup,
+			Type:     mappedType,
+			Tags:     tagsInGroup,
+			TotalNum: int(totalCount),
 		})
 	}
 

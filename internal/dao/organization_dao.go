@@ -1,12 +1,15 @@
 package dao
 
 import (
+	"fmt"
 	"sync"
 
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
 	"dingoscheduler/pkg/config"
 	"dingoscheduler/pkg/util"
+
+	"go.uber.org/zap"
 )
 
 var mu sync.Mutex
@@ -59,4 +62,22 @@ func (o *OrganizationDao) GetOrganization(orgName string) (string, error) {
 		return v.(string), nil
 	}
 	return "", nil
+}
+
+func (d *OrganizationDao) FindAllNames() ([]string, error) {
+	var names []string
+	err := d.baseData.BizDB.Table("organization").Pluck("name", &names).Error
+	if err != nil {
+		zap.S().Errorf("查询organization表name字段失败：%v", err)
+		return nil, err
+	}
+	return names, nil
+}
+
+func (d *OrganizationDao) SaveOrgBySql(org *model.Organization) error {
+	orgSql := fmt.Sprintf("INSERT INTO organization(name, icon) VALUES ('%s','%s')", org.Name, org.Icon)
+	if err := d.baseData.BizDB.Exec(orgSql).Error; err != nil {
+		return err
+	}
+	return nil
 }

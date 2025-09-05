@@ -38,6 +38,7 @@ type Config struct {
 	Retry       Retry        `json:"retry" yaml:"retry"`
 	Log         LogConfig    `json:"log" yaml:"log"`
 	Avatar      Avatar       `json:"avatar" yaml:"avatar"`
+	Oss         Oss          `json:"oss" yaml:"oss"`
 }
 
 type ServerConfig struct {
@@ -74,6 +75,12 @@ type Avatar struct {
 type Cache struct {
 	DefaultExpiration int `json:"defaultExpiration" yaml:"defaultExpiration" `
 	CleanupInterval   int `json:"cleanupInterval" yaml:"cleanupInterval"`
+}
+
+type Oss struct {
+	Path       string `yaml:"path"`
+	BucketName string `yaml:"bucketName"`
+	Region     string `yaml:"region"`
 }
 
 type Scheduler struct {

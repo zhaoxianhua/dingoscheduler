@@ -18,16 +18,14 @@ import (
 
 // Tag 通用标签结构体（增加subType字段）
 type Tag struct {
-	Type    string `json:"type"`    // 标签类型（如"region"、"license"、"task"等）
-	Label   string `json:"label"`   // 标签显示文本
-	ID      string `json:"id"`      // 标签唯一ID
-	SubType string `json:"subType"` // 新增：子类型（如"nlp"等）
+	Type    string `json:"type"`
+	Label   string `json:"label"`
+	ID      string `json:"id"`
+	SubType string `json:"subType"`
 }
 
-// AllTagsResponse 完整API响应结构体（键为标签类型，值为对应类型的标签数组）
 type AllTagsResponse map[string][]Tag
 
-// readBody 读取HTTP响应体内容（用于错误日志打印）
 func readBody(body io.ReadCloser) string {
 	defer body.Close()
 	content, err := io.ReadAll(body)
@@ -37,7 +35,6 @@ func readBody(body io.ReadCloser) string {
 	return string(content)
 }
 
-// syncAllTags 同步所有类型的标签入库（批量插入，不检查是否已存在）
 func syncAllTags(modelTagDao *dao.TagDao) error {
 	apiURL := "https://hf-mirror.com/api/models-tags-by-type"
 
@@ -59,7 +56,6 @@ func syncAllTags(modelTagDao *dao.TagDao) error {
 		return fmt.Errorf("API返回非成功状态码：%d，响应内容：%s", resp.StatusCode, bodyContent)
 	}
 
-	// 解析所有类型的标签（键为类型名，值为标签数组）
 	var allTags AllTagsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&allTags); err != nil {
 		return fmt.Errorf("解析JSON响应失败：%w", err)
@@ -71,16 +67,10 @@ func syncAllTags(modelTagDao *dao.TagDao) error {
 	}
 	zap.S().Infof("成功从API获取到%d种类型的标签", len(allTags))
 
-	// 收集所有需要插入的标签
 	var allDbTags []*model.Tag
-
-	// 遍历所有标签类型
 	for tagType, tags := range allTags {
 		zap.S().Infof("开始处理类型为[%s]的标签，共%d个", tagType, len(tags))
-
-		// 遍历该类型下的所有标签
 		for _, apiTag := range tags {
-			// 确保标签类型与外层键一致
 			if apiTag.Type == "" {
 				apiTag.Type = tagType
 				zap.S().Debugf("标签[id=%s]类型为空，使用外层类型[%s]", apiTag.ID, tagType)
@@ -97,7 +87,6 @@ func syncAllTags(modelTagDao *dao.TagDao) error {
 		}
 	}
 
-	// 批量插入所有标签
 	if len(allDbTags) > 0 {
 		zap.S().Infof("准备批量插入%d个标签", len(allDbTags))
 		if err := modelTagDao.CreateBatch(allDbTags); err != nil {
@@ -120,7 +109,6 @@ func init() {
 }
 
 func main() {
-	// 初始化zap日志
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		fmt.Printf("初始化zap日志失败: %v\n", err)
