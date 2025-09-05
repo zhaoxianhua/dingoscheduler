@@ -21,7 +21,6 @@ func NewTagDao(data *data.BaseData) *TagDao {
 // ExistsByID 检查标签是否已存在（根据id主键）
 func (d *TagDao) ExistsByID(tagID string) (bool, error) {
 	var count int64
-	// 统计id=tagID的记录数
 	err := d.baseData.BizDB.Table("tag").Where("id = ?", tagID).Count(&count).Error
 	if err != nil {
 		zap.S().Errorf("查询标签[id=%s]存在性失败：%v", tagID, err)
@@ -31,7 +30,6 @@ func (d *TagDao) ExistsByID(tagID string) (bool, error) {
 }
 
 func (d *TagDao) Create(tag *model.Tag) error {
-	// 使用GORM的Create方法插入数据
 	if err := d.baseData.BizDB.Table("tag").Create(tag).Error; err != nil {
 		zap.S().Errorf("插入标签[id=%s]到数据库失败：%v", tag.ID, err)
 		return err
@@ -73,6 +71,10 @@ func (d *TagDao) TagListByCondition(condition *modelquery.TagQuery) ([]*model.Ta
 	var tags []*model.Tag
 	query := d.baseData.BizDB.Table("tag")
 
+	if len(condition.Id) > 0 {
+		query = query.Where("id = ?", condition.Id)
+	}
+
 	if len(condition.Labels) > 0 {
 		query = query.Where("label IN (?)", condition.Labels)
 	}
@@ -90,4 +92,19 @@ func (d *TagDao) TagListByCondition(condition *modelquery.TagQuery) ([]*model.Ta
 	}
 
 	return tags, nil
+}
+
+func (d *TagDao) TagCountByCondition(condition *modelquery.TagQuery) (int64, error) {
+	var count int64
+	query := d.baseData.BizDB.Table("tag")
+
+	if len(condition.Types) > 0 {
+		query = query.Where("type IN (?)", condition.Types)
+	}
+
+	if err := query.Count(&count).Error; err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }

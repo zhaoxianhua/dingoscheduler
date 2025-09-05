@@ -42,39 +42,41 @@ var (
 )
 
 func init() {
-	// 解析命令行参数
 	flag.StringVar(&configPath, "config", "./config/config.yaml", "配置文件路径")
 	flag.StringVar(&repoPathParam, "repoPath", "/Users/shijie/yonyou/dingospeed/repos", "仓库路径")
 	flag.StringVar(&instanceID, "instanceId", "mas", "实例ID（必填）")
-	flag.StringVar(&apiBaseURL, "apiBase", "http://127.0.0.:8091", "获取offset的API基础地址")
+	flag.StringVar(&apiBaseURL, "apiBase", "http://127.0.0.1:8091", "获取offset的API基础地址")
 	flag.Int64Var(&minFileSize, "minSize", 0, "最小文件大小阈值，单位为MB，小于此值的文件不录入数据库")
 	flag.Parse()
 
-	// 校验必填参数
 	if instanceID == "" {
 		zap.S().Fatal("必须提供instanceId参数，请使用 -instanceId 选项")
 	}
 
-	// 单位转换：MB -> 字节
 	minFileSize *= 1024 * 1024
 	zap.S().Infof("文件大小过滤阈值设置为: %d MB (%d 字节)", minFileSize/(1024*1024), minFileSize)
 }
 
 func main() {
-	// 读取并处理目标目录下的文件（仅处理本次扫描到的）
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		fmt.Printf("初始化zap日志失败: %v\n", err)
+		os.Exit(1)
+	}
+	defer logger.Sync()
+	zap.ReplaceGlobals(logger)
+
 	fileInfos, err := processDirectory(repoPathParam)
 	if err != nil {
 		zap.S().Fatalf("处理目录失败: %v", err)
 	}
 
-	// 检查是否有符合条件的文件
 	if len(fileInfos) == 0 {
 		zap.S().Warn("未找到任何符合条件的文件进行处理")
 		return
 	}
 	zap.S().Infof("本次从路径 %s 读取到 %d 个符合条件的文件", repoPathParam, len(fileInfos))
 
-	// 过滤小于阈值的文件（仍属于本次读取到的范围）
 	filteredFileInfos := make([]FileInfo, 0)
 	for _, fileInfo := range fileInfos {
 		if fileInfo.FileSize >= minFileSize {
@@ -93,7 +95,6 @@ func main() {
 		return
 	}
 
-	// 生成本次读取到的所有候选记录
 	allCandidateRecords := make([]model.ModelFileRecord, 0, len(filteredFileInfos))
 	for _, item := range filteredFileInfos {
 		m := model.ModelFileRecord{
@@ -107,7 +108,6 @@ func main() {
 		allCandidateRecords = append(allCandidateRecords, m)
 	}
 
-	// 初始化数据库连接
 	conf, err := config.Scan(configPath)
 	if err != nil {
 		zap.S().Fatalf("读取配置文件失败: %v", err)
@@ -117,16 +117,13 @@ func main() {
 		zap.S().Fatalf("初始化基础数据失败: %v", err)
 	}
 
-	// 初始化ModelFileRecord的DAO
 	modelFileRecordDao := dao.NewModelFileRecordDao(baseData)
 
-	// 收集本次候选记录的所有Etag
 	allCandidateEtags := make([]string, 0, len(allCandidateRecords))
 	for _, r := range allCandidateRecords {
 		allCandidateEtags = append(allCandidateEtags, r.Etag)
 	}
 
-	// 步骤：查询数据库中已存在的Etag
 	existingEtags, err := modelFileRecordDao.ExistEtags(allCandidateEtags)
 	if err != nil {
 		zap.S().Fatalf("查询已存在的Etag失败: %v", err)
@@ -136,9 +133,8 @@ func main() {
 		existingEtagMap[etag] = struct{}{}
 	}
 
-	// 步骤2：拆分本次候选记录为“新记录”和“已存在记录的Etag”
-	newRecords := make([]model.ModelFileRecord, 0) // 本次需新增到ModelFileRecord的记录
-	existingCandidateEtags := make([]string, 0)    // 本次读取到但已存在于数据库的Etag
+	newRecords := make([]model.ModelFileRecord, 0)
+	existingCandidateEtags := make([]string, 0)
 	for _, r := range allCandidateRecords {
 		if _, exists := existingEtagMap[r.Etag]; !exists {
 			newRecords = append(newRecords, r)
@@ -148,7 +144,6 @@ func main() {
 		}
 	}
 
-	// 步骤3：保存新记录到ModelFileRecord
 	if len(newRecords) > 0 {
 		if err := modelFileRecordDao.BatchSave(newRecords); err != nil {
 			zap.S().Fatalf("批量保存ModelFileRecord失败: %v", err)
@@ -158,8 +153,6 @@ func main() {
 		zap.S().Info("本次读取到的记录均已存在于ModelFileRecord，无需新增")
 	}
 
-	// 步骤4：收集本次读取到的所有RecordID
-	// 4. 本次新增记录的ID（newRecordIDs）
 	newRecordIDs := make([]int64, 0, len(newRecords))
 	for _, r := range newRecords {
 		if r.ID != 0 {
@@ -169,10 +162,8 @@ func main() {
 		}
 	}
 
-	// 4.2 本次读取到的已存在记录的ID（existingRecordIDs）
 	existingRecordIDs := make([]int64, 0)
 	if len(existingCandidateEtags) > 0 {
-		// 仅查询本次读取到的已存在Etag对应的ID（确保是本次扫描到的）
 		existingRecordIDs, err = modelFileRecordDao.GetIDsByEtags(existingCandidateEtags)
 		if err != nil {
 			zap.S().Fatalf("根据Etag查询已存在记录的ID失败: %v", err)
@@ -180,7 +171,6 @@ func main() {
 		zap.S().Infof("本次读取到的已存在记录中，共查询到 %d 个有效ID", len(existingRecordIDs))
 	}
 
-	// 4.3 合并本次读取到的所有RecordID（仅这部分会生成ModelFileProcess）
 	allNeedProcessRecordIDs := append(newRecordIDs, existingRecordIDs...)
 	if len(allNeedProcessRecordIDs) == 0 {
 		zap.S().Info("本次读取到的记录中，没有有效RecordID，无需生成ModelFileProcess记录")
@@ -189,18 +179,14 @@ func main() {
 	zap.S().Infof("本次需为 %d 个RecordID生成ModelFileProcess记录（新记录: %d, 已存在记录: %d）",
 		len(allNeedProcessRecordIDs), len(newRecordIDs), len(existingRecordIDs))
 
-	// 步骤5：生成待保存的ModelFileProcess记录（仅基于本次读取到的RecordID）
 	modelFileProcessDao := dao.NewModelFileProcessDao(baseData)
-
-	// 构建RecordID到完整信息的映射（用于查询offset）
 	recordInfoMap := make(map[int64]model.ModelFileRecord)
-	// 新记录的信息
 	for _, r := range newRecords {
 		if r.ID != 0 {
 			recordInfoMap[r.ID] = r
 		}
 	}
-	// 已存在记录的信息（从数据库查询，确保信息完整）
+
 	if len(existingRecordIDs) > 0 {
 		existingRecords, err := modelFileRecordDao.GetByIDs(existingRecordIDs)
 		if err != nil {
@@ -211,7 +197,6 @@ func main() {
 		}
 	}
 
-	// 生成Process记录
 	processRecords := make([]model.ModelFileProcess, 0, len(allNeedProcessRecordIDs))
 	for _, recordID := range allNeedProcessRecordIDs {
 		record, exists := recordInfoMap[recordID]
@@ -220,7 +205,6 @@ func main() {
 			continue
 		}
 
-		// 调用API获取offset值
 		offset, err := getOffsetValue(record.Datatype, record.Org, record.Repo, record.Etag, record.FileSize)
 		if err != nil {
 			zap.S().Warnf("RecordID %d 获取offset失败: %v，使用默认值0", recordID, err)
@@ -231,12 +215,10 @@ func main() {
 			RecordID:   recordID,
 			InstanceID: instanceID,
 			OffsetNum:  offset,
-			Status:     3, // 固定状态：下载完成
+			Status:     3,
 		})
 	}
 
-	// 步骤6：对ModelFileProcess记录去重（仅检查本次处理的RecordID）
-	// 查询当前InstanceID下，本次处理的RecordID中哪些已存在Process记录
 	existingProcessRecordIDs, err := modelFileProcessDao.ExistRecordIDs(instanceID, allNeedProcessRecordIDs)
 	if err != nil {
 		zap.S().Fatalf("查询已存在的ModelFileProcess记录失败: %v", err)
@@ -246,7 +228,6 @@ func main() {
 		existingProcessRecordIDMap[id] = struct{}{}
 	}
 
-	// 过滤重复记录（仅保留本次处理范围内且未存在的）
 	newProcessRecords := make([]model.ModelFileProcess, 0, len(processRecords))
 	for _, p := range processRecords {
 		if _, exists := existingProcessRecordIDMap[p.RecordID]; !exists {
@@ -256,7 +237,6 @@ func main() {
 		}
 	}
 
-	// 步骤7：保存新的ModelFileProcess记录（仅本次新增的）
 	if len(newProcessRecords) > 0 {
 		if err := modelFileProcessDao.BatchSave(newProcessRecords); err != nil {
 			zap.S().Fatalf("批量保存ModelFileProcess失败: %v", err)
@@ -298,7 +278,6 @@ func getOffsetValue(dataType, org, repo, etag string, fileSize int64) (int64, er
 	return offset, nil
 }
 
-// processDirectory 遍历目录，收集符合条件的文件信息（从paths-info的孙子目录开始记录路径）
 func processDirectory(rootPath string) ([]FileInfo, error) {
 	var result []FileInfo
 
@@ -327,7 +306,6 @@ func processDirectory(rootPath string) ([]FileInfo, error) {
 		}
 
 		components := strings.Split(relPath, string(filepath.Separator))
-		// 校验路径结构：必须包含 api/[models|datasets|spaces]/org/repo/paths-info 前缀
 		if len(components) < 5 ||
 			components[0] != "api" ||
 			!(components[1] == "models" || components[1] == "datasets" || components[1] == "spaces") ||
@@ -342,27 +320,20 @@ func processDirectory(rootPath string) ([]FileInfo, error) {
 				return nil
 			} else if exists {
 				zap.S().Debugf("找到符合条件的文件: %s", jsonFilePath)
-
-				// 提取路径：从 paths-info 的下一级的下一级（孙子目录）开始
-				// components[6:] 即为目标路径片段（跳过 paths-info 及其直接子目录）
 				var pathSegments []string
-				// 确保路径至少有7级（否则没有孙子目录）
 				if len(components) >= 7 {
-					pathSegments = components[6:] // 从孙子目录开始提取（例如：["grandchild", "subdir"]）
+					pathSegments = components[6:]
 				} else {
-					// 不足7级：说明只有 paths-info 或其直接子目录，无孙子目录，路径为空
 					pathSegments = []string{}
 				}
 
-				// 拼接完整路径（例如："grandchild/subdir"）
 				fullPath := filepath.Join(pathSegments...)
-
 				fileInfo, err := processJsonFile(
 					jsonFilePath,
 					components[1],
 					components[2],
 					components[3],
-					fullPath, // 传递从孙子目录开始的路径
+					fullPath,
 				)
 				if err != nil {
 					zap.S().Warnf("处理JSON文件失败 %s: %v", jsonFilePath, err)
@@ -381,7 +352,6 @@ func processDirectory(rootPath string) ([]FileInfo, error) {
 	return result, err
 }
 
-// fileExists 检查文件/目录是否存在（实现不变）
 func fileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -393,7 +363,6 @@ func fileExists(path string) (bool, error) {
 	return false, err
 }
 
-// processJsonFile 解析JSON文件，提取关键信息（实现不变）
 func processJsonFile(jsonPath, dataType, org, repo, fileName string) (*FileInfo, error) {
 	bytes, err := util.ReadFileToBytes(jsonPath)
 	if err != nil {
