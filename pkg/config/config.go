@@ -127,6 +127,10 @@ func (c *Config) GetCleanupInterval() time.Duration {
 	return time.Duration(c.Cache.CleanupInterval) * time.Hour
 }
 
+func (c *Config) GetSpeedExpiration() time.Duration {
+	return time.Duration(5) * time.Minute
+}
+
 func Scan(path string) (*Config, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {

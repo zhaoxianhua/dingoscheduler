@@ -34,7 +34,7 @@ func wireApp(configConfig *config.Config) (*app.App, func(), error) {
 	modelFileProcessDao := dao.NewModelFileProcessDao(baseData)
 	repositoryTagDao := dao.NewRepositoryTagDao(baseData)
 	repositoryDao := dao.NewRepositoryDao(baseData, repositoryTagDao)
-	schedulerService := service.NewSchedulerService(dingospeedDao, modelFileRecordDao, modelFileProcessDao, repositoryDao)
+	schedulerService := service.NewSchedulerService(baseData, dingospeedDao, modelFileRecordDao, modelFileProcessDao, repositoryDao)
 	preheatJobDao := dao.NewPreheatJobDao(baseData)
 	preheatJobService := service.NewPreheatJobService(dingospeedDao, modelFileProcessDao, preheatJobDao)
 	tagDao := dao.NewTagDao(baseData)
