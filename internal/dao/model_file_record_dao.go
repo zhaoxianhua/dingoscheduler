@@ -231,21 +231,21 @@ func (d *ModelFileRecordDao) GetIDsByEtagsOrFields(etag, datatype, org, repo, na
 	return ids, nil
 }
 
-func (d *ModelFileRecordDao) BatchQueryIDsByEtags(etags []string) ([]int64, error) {
+func (d *ModelFileRecordDao) BatchQueryByEtags(etags []string) ([]model.ModelFileRecord, error) {
 	if len(etags) == 0 {
-		return []int64{}, nil
+		return []model.ModelFileRecord{}, nil
 	}
 
-	var ids []int64
+	var records []model.ModelFileRecord
 	result := d.baseData.BizDB.Model(&model.ModelFileRecord{}).
 		Where("etag IN (?)", etags).
-		Pluck("id", &ids)
+		Find(&records)
 
 	if result.Error != nil {
-		return nil, fmt.Errorf("通过etag查询ID失败: %w", result.Error)
+		return nil, fmt.Errorf("通过etag查询记录失败: %w", result.Error)
 	}
 
-	return ids, nil
+	return records, nil
 }
 
 func (d *ModelFileRecordDao) BatchQueryByIDs(ids []int64) ([]model.ModelFileRecord, error) {
