@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -144,16 +143,24 @@ func (handler *AlayanewHandler) TagHandler(c echo.Context) error {
 	var tagTypes []string
 	if tagTypesStr != "" {
 		tagTypesStr = strings.TrimSpace(tagTypesStr)
-		if err := json.Unmarshal([]byte(tagTypesStr), &tagTypes); err != nil {
-			return util.ErrorEntryUnknown(c, 400, "type 参数格式错误，应为 JSON 数组字符串")
+		parts := strings.Split(tagTypesStr, ",")
+		for _, part := range parts {
+			trimmed := strings.TrimSpace(part)
+			if trimmed != "" {
+				tagTypes = append(tagTypes, trimmed)
+			}
 		}
 	}
 
 	var tagSubTypes []string
 	if tagSubTypeStr != "" {
 		tagSubTypeStr = strings.TrimSpace(tagSubTypeStr)
-		if err := json.Unmarshal([]byte(tagSubTypeStr), &tagSubTypes); err != nil {
-			return util.ErrorEntryUnknown(c, 400, "subType 参数格式错误，应为 JSON 数组字符串")
+		parts := strings.Split(tagSubTypeStr, ",")
+		for _, part := range parts {
+			trimmed := strings.TrimSpace(part)
+			if trimmed != "" {
+				tagSubTypes = append(tagSubTypes, trimmed)
+			}
 		}
 	}
 
