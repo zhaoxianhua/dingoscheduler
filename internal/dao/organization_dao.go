@@ -64,9 +64,9 @@ func (o *OrganizationDao) GetOrganization(orgName string) (string, error) {
 	return "", nil
 }
 
-func (d *OrganizationDao) FindAllNames() ([]string, error) {
+func (o *OrganizationDao) FindAllNames() ([]string, error) {
 	var names []string
-	err := d.baseData.BizDB.Table("organization").Pluck("name", &names).Error
+	err := o.baseData.BizDB.Table("organization").Pluck("name", &names).Error
 	if err != nil {
 		zap.S().Errorf("查询organization表name字段失败：%v", err)
 		return nil, err
@@ -74,10 +74,12 @@ func (d *OrganizationDao) FindAllNames() ([]string, error) {
 	return names, nil
 }
 
-func (d *OrganizationDao) SaveOrgBySql(org *model.Organization) error {
+func (o *OrganizationDao) SaveOrgBySql(org *model.Organization) error {
 	orgSql := fmt.Sprintf("INSERT INTO organization(name, icon) VALUES ('%s','%s')", org.Name, org.Icon)
-	if err := d.baseData.BizDB.Exec(orgSql).Error; err != nil {
+	if err := o.baseData.BizDB.Exec(orgSql).Error; err != nil {
 		return err
 	}
+	orgKey := util.GetOrgNameKey(org.Name)
+	o.baseData.Cache.Delete(orgKey)
 	return nil
 }

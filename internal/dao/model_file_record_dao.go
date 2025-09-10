@@ -193,7 +193,7 @@ func (d *ModelFileRecordDao) GetByIDs(ids []int64) ([]model.ModelFileRecord, err
 	return records, nil
 }
 
-func (d *ModelFileRecordDao) FindDistinctRepos() ([]string, error) {
+func (d *ModelFileRecordDao) FindDistinctOrgs() ([]string, error) {
 	var orgs []string
 	err := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Distinct("org").Find(&orgs).Error
 	return orgs, err

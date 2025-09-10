@@ -147,10 +147,10 @@ func FetchAvatarURL(orgName string) (string, error) {
 }
 
 func DownloadAvatar(
-	avatarURL, saveRoot, subDir, org, ossBucketName string,
+	avatarURL, saveRoot, org, ossBucketName string,
 	ossOption *ImageUploadOption, // 引用UploadImageToOSS的ImageUploadOption类型
 ) (string, error) {
-	localFileName := fmt.Sprintf("%s_%s_avatar.jpg", subDir, org)
+	localFileName := fmt.Sprintf("_%s_avatar.jpg", org)
 	localSavePath := filepath.Join(saveRoot, localFileName)
 	client := &http.Client{
 		Timeout: 15 * time.Second,
@@ -170,7 +170,10 @@ func DownloadAvatar(
 		return "", fmt.Errorf("下载状态异常（URL=%s，状态码=%d）", avatarURL, resp.StatusCode)
 	}
 	zap.S().Debugf("头像文件流获取成功：URL=%s，预估大小=%d bytes", avatarURL, resp.ContentLength)
-
+	if err = MakeDirs(localSavePath); err != nil {
+		zap.S().Errorf("create %s dir err.%v", localSavePath, err)
+		return "", err
+	}
 	localFile, err := os.Create(localSavePath)
 	if err != nil {
 		return "", fmt.Errorf("创建本地暂存文件（路径=%s）失败：%w", localSavePath, err)

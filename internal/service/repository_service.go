@@ -24,6 +24,7 @@ import (
 	"dingoscheduler/internal/model"
 	"dingoscheduler/internal/model/dto"
 	"dingoscheduler/internal/model/query"
+	"dingoscheduler/pkg/config"
 	myerr "dingoscheduler/pkg/error"
 	"dingoscheduler/pkg/util"
 
@@ -38,33 +39,33 @@ type RepositoryService struct {
 	modelFileProcessDao *dao.ModelFileProcessDao
 	repositoryDao       *dao.RepositoryDao
 	organizationDao     *dao.OrganizationDao
+	organizationService *OrganizationService
 	tagDao              *dao.TagDao
 	client              *http.Client
 }
 
 func NewRepositoryService(dingospeedDao *dao.DingospeedDao, modelFileProcessDao *dao.ModelFileProcessDao,
-	repositoryDao *dao.RepositoryDao, tagDao *dao.TagDao, organizationDao *dao.OrganizationDao) *RepositoryService {
+	repositoryDao *dao.RepositoryDao, tagDao *dao.TagDao, organizationDao *dao.OrganizationDao, organizationService *OrganizationService) *RepositoryService {
 	return &RepositoryService{
 		dingospeedDao:       dingospeedDao,
 		repositoryDao:       repositoryDao,
 		modelFileProcessDao: modelFileProcessDao,
 		tagDao:              tagDao,
 		organizationDao:     organizationDao,
+		organizationService: organizationService,
 		client:              &http.Client{},
 	}
 }
 
 func (s *RepositoryService) PersistRepo(c echo.Context, repoQuery *query.PersistRepoQuery) error {
 	zap.S().Debugf("PersistRepo instanceId:%s", repoQuery.InstanceIds)
-	pipelineTags, err := s.tagDao.TagListByCondition(&query.TagQuery{
-		Types: []string{"pipeline_tag"},
-	})
+	var (
+		pipelineMap map[string]string
+		err         error
+	)
+	pipelineMap, err = s.cachePipelineTags()
 	if err != nil {
 		return err
-	}
-	pipelineMap := make(map[string]string, 0)
-	for _, item := range pipelineTags {
-		pipelineMap[item.ID] = item.Label
 	}
 	for _, instanceId := range repoQuery.InstanceIds {
 		// 存在下载记录和进度，但模型在仓库不存在。
@@ -73,7 +74,7 @@ func (s *RepositoryService) PersistRepo(c echo.Context, repoQuery *query.Persist
 			return err
 		}
 		if len(freeRepositories) == 0 {
-			return nil
+			return myerr.New("没有要持久化的仓库。")
 		}
 		for _, repository := range freeRepositories {
 			entity, err := s.dingospeedDao.GetEntity(instanceId, true)
@@ -98,12 +99,17 @@ func (s *RepositoryService) PersistRepo(c echo.Context, repoQuery *query.Persist
 				return err
 			}
 			// 根据当前版本的元数据与下载进度、进度比较，只将完整的模型做保存。
-			isComplete, err := s.verifyRepoComplete(&metaData, instanceId, repository.Datatype, repository.Org, repository.Repo)
+			// isComplete, err := s.verifyRepoComplete(&metaData, instanceId, repository.Datatype, repository.Org, repository.Repo)
+			// if err != nil {
+			// 	return err
+			// }
+			// if !isComplete {
+			// 	continue
+			// }
+			// 保存组织图片
+			err = s.organizationService.PersistOrgLogo(repository.Org)
 			if err != nil {
 				return err
-			}
-			if !isComplete {
-				continue
 			}
 			repo := &model.Repository{
 				InstanceId:    instanceId,
@@ -135,6 +141,20 @@ func (s *RepositoryService) PersistRepo(c echo.Context, repoQuery *query.Persist
 	return nil
 }
 
+func (s *RepositoryService) cachePipelineTags() (map[string]string, error) {
+	pipelineTags, err := s.tagDao.TagListByCondition(&query.TagQuery{
+		Types: []string{"pipeline_tag"},
+	})
+	if err != nil {
+		return nil, err
+	}
+	pipelineMap := make(map[string]string, 0)
+	for _, item := range pipelineTags {
+		pipelineMap[item.ID] = item.Label
+	}
+	return pipelineMap, nil
+}
+
 func (s *RepositoryService) verifyRepoComplete(metaData *dto.CommitHfSha, instanceId, datatype, org, repo string) (bool, error) {
 	size, err := s.repositoryDao.VerifyRepoComplete(instanceId, datatype, org, repo)
 	if err != nil {
@@ -156,7 +176,7 @@ func (s *RepositoryService) RepositoryList(query *query.ModelQuery) ([]*dto.Repo
 		if icon, err := s.organizationDao.GetOrganization(repo.Org); err != nil {
 			return nil, 0, err
 		} else {
-			repo.Icon = icon
+			repo.Icon = fmt.Sprintf("%s%s", config.SysConfig.Oss.Path, icon)
 		}
 	}
 	return repositories, size, nil
@@ -179,7 +199,7 @@ func (s *RepositoryService) GetRepositoryById(id int64) (*dto.Repository, error)
 	if icon, err := s.organizationDao.GetOrganization(repository.Org); err != nil {
 		return nil, err
 	} else {
-		repo.Icon = icon
+		repo.Icon = fmt.Sprintf("%s%s", config.SysConfig.Oss.Path, icon)
 	}
 	return &repo, nil
 }

@@ -66,6 +66,9 @@ func ErrorEntryUnknown(ctx echo.Context, statusCode int, msg string) error {
 	content := map[string]string{
 		"error": msg,
 	}
+	if statusCode == 0 {
+		statusCode = http.StatusInternalServerError
+	}
 	return Response(ctx, statusCode, nil, content)
 }
 
