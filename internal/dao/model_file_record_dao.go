@@ -230,3 +230,37 @@ func (d *ModelFileRecordDao) GetIDsByEtagsOrFields(etag, datatype, org, repo, na
 
 	return ids, nil
 }
+
+func (d *ModelFileRecordDao) BatchQueryIDsByEtags(etags []string) ([]int64, error) {
+	if len(etags) == 0 {
+		return []int64{}, nil
+	}
+
+	var ids []int64
+	result := d.baseData.BizDB.Model(&model.ModelFileRecord{}).
+		Where("etag IN (?)", etags).
+		Pluck("id", &ids)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("通过etag查询ID失败: %w", result.Error)
+	}
+
+	return ids, nil
+}
+
+func (d *ModelFileRecordDao) BatchQueryByIDs(ids []int64) ([]model.ModelFileRecord, error) {
+	if len(ids) == 0 {
+		return []model.ModelFileRecord{}, nil
+	}
+
+	var records []model.ModelFileRecord
+	result := d.baseData.BizDB.Model(&model.ModelFileRecord{}).
+		Where("id IN (?)", ids).
+		Find(&records)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("查询记录详情失败: %w", result.Error)
+	}
+
+	return records, nil
+}
