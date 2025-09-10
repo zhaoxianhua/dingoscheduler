@@ -88,7 +88,7 @@ func main() {
 	}
 
 	zap.S().Infof("过滤后，本次需处理的文件剩余 %d 个（大于等于 %d MB）",
-		len(filteredFileInfos), minFileSize/(024*024))
+		len(filteredFileInfos), minFileSize/(1024*1024))
 
 	if len(filteredFileInfos) == 0 {
 		zap.S().Warn("所有文件都小于指定的大小阈值，没有文件将被处理")
