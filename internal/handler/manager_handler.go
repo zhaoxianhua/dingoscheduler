@@ -64,7 +64,7 @@ func (handler *ManagerHandler) PersistRepoHandler(c echo.Context) error {
 		if e, ok := err.(myerr.Error); ok {
 			return util.ErrorEntryUnknown(c, e.StatusCode(), e.Error())
 		}
-		return util.ErrorProxyError(c)
+		return util.ResponseError(c)
 	}
-	return util.ResponseData(c, nil)
+	return util.ResponseData(c, map[string]string{"data": "操作成功"})
 }

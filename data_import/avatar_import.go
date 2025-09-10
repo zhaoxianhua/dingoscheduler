@@ -58,12 +58,12 @@ func main() {
 	modelFileRecordDao := dao.NewModelFileRecordDao(baseData)
 	organizationDao := dao.NewOrganizationDao(baseData)
 	zap.S().Infof("DAO层初始化完成（ModelFileRecordDao、OrganizationDao）")
-	repos, err := modelFileRecordDao.FindDistinctRepos()
+	orgs, err := modelFileRecordDao.FindDistinctOrgs()
 	if err != nil {
 		zap.S().Fatalf("从model_file_record表查询去重repo失败：%v", err)
 	}
-	zap.S().Infof("共查询到 %d 个去重repo记录", len(repos))
-	if len(repos) == 0 {
+	zap.S().Infof("共查询到 %d 个去重repo记录", len(orgs))
+	if len(orgs) == 0 {
 		zap.S().Warnf("未查询到任何repo记录，无需处理")
 		return
 	}
@@ -79,62 +79,60 @@ func main() {
 	zap.S().Infof("从organization表查询到 %d 个已存在组织", len(existingOrgMap))
 
 	successCount := 0
-	subDir := ""
 	ossOption := &util.ImageUploadOption{
 		Region:  conf.Oss.Region,
 		Timeout: 15 * time.Second,
 	}
 
-	for idx, repo := range repos {
-		if repo == "" {
-			zap.S().Warnf("处理第 %d/%d 个repo：空repo，跳过", idx+1, len(repos))
+	for idx, org := range orgs {
+		if org == "" {
+			zap.S().Warnf("处理第 %d/%d 个repo：空repo，跳过", idx+1, len(orgs))
 			continue
 		}
 
-		if existingOrgMap[repo] {
-			zap.S().Infof("处理第 %d/%d 个repo：%s 已存在于organization表，跳过", idx+1, len(repos), repo)
+		if existingOrgMap[org] {
+			zap.S().Infof("处理第 %d/%d 个repo：%s 已存在于organization表，跳过", idx+1, len(orgs), org)
 			continue
 		}
 
-		zap.S().Infof("开始处理第 %d/%d 个repo：%s", idx+1, len(repos), repo)
-		avatarURL, err := util.FetchAvatarURL(repo)
+		zap.S().Infof("开始处理第 %d/%d 个repo：%s", idx+1, len(orgs), org)
+		avatarURL, err := util.FetchAvatarURL(org)
 		if err != nil {
-			zap.S().Errorf("处理repo [%s] 失败：获取头像URL错误，%v，跳过", repo, err)
+			zap.S().Errorf("处理repo [%s] 失败：获取头像URL错误，%v，跳过", org, err)
 			continue
 		}
 
-		zap.S().Infof("repo [%s] 成功获取头像URL：%s", repo, avatarURL)
+		zap.S().Infof("org [%s] 成功获取头像URL：%s", org, avatarURL)
 		fullOssObjectKey, err := util.DownloadAvatar(
 			avatarURL,
 			imageSavePath,
-			subDir,
-			repo,
+			org,
 			ossBucketName,
 			ossOption,
 		)
 		if err != nil {
-			zap.S().Errorf("处理repo [%s] 失败：头像上传OSS错误，%v，跳过", repo, err)
+			zap.S().Errorf("处理repo [%s] 失败：头像上传OSS错误，%v，跳过", org, err)
 			continue
 		}
 
 		onlyFileName := filepath.Base(fullOssObjectKey)
-		zap.S().Infof("repo [%s] 头像上传OSS成功：完整路径=%s，提取文件名=%s",
-			repo, fullOssObjectKey, onlyFileName)
+		zap.S().Infof("org [%s] 头像上传OSS成功：完整路径=%s，提取文件名=%s",
+			org, fullOssObjectKey, onlyFileName)
 
 		org := &model.Organization{
-			Name: repo,
+			Name: org,
 			Icon: onlyFileName,
 		}
 
 		if err := organizationDao.SaveOrgBySql(org); err != nil {
-			zap.S().Errorf("处理repo [%s] 失败：插入organization表错误，%v，跳过", repo, err)
+			zap.S().Errorf("处理repo [%s] 失败：插入organization表错误，%v，跳过", org, err)
 			continue
 		}
 		successCount++
-		zap.S().Infof("repo [%s] 处理成功：已插入organization表（name=%s, 存入数据库的头像名=%s）",
-			repo, repo, onlyFileName)
+		zap.S().Infof("org [%s] 处理成功：已插入organization表（name=%s, 存入数据库的头像名=%s）",
+			org, org, onlyFileName)
 	}
 
 	zap.S().Infof("所有repo处理完成！总数量：%d，成功插入：%d，跳过（空/已存在）：%d",
-		len(repos), successCount, len(repos)-successCount)
+		len(orgs), successCount, len(orgs)-successCount)
 }

@@ -28,7 +28,9 @@ func NewMysqlClient(config *config.DBConfig) (*gorm.DB, error) {
 		username, password, host, port, database, timeout)
 	// 连接MYSQL, 获得DB类型实例，用于后面的数据库读写操作。
 
-	_db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	_db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		SkipDefaultTransaction: false,
+	})
 	if err != nil {
 		panic("连接mysql数据库失败, error =" + err.Error())
 	}

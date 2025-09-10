@@ -16,6 +16,7 @@ package dao
 
 import (
 	"fmt"
+	"strings"
 
 	"dingoscheduler/internal/data"
 	"dingoscheduler/internal/model"
@@ -112,22 +113,22 @@ func (r *RepositoryDao) ModelList(query *query.ModelQuery) ([]*dto.Repository, i
 	}
 	tags := make([]string, 0)
 	if query.Library != "" {
-		tags = append(tags, query.Library)
+		tags = append(tags, strings.Split(query.Library, ",")...)
 	}
 	if query.Apps != "" {
-		tags = append(tags, query.Apps)
+		tags = append(tags, strings.Split(query.Apps, ",")...)
 	}
 	if query.InferenceProvider != "" {
-		tags = append(tags, query.InferenceProvider)
+		tags = append(tags, strings.Split(query.InferenceProvider, ",")...)
 	}
 	if query.Language != "" {
-		tags = append(tags, query.Language)
+		tags = append(tags, strings.Split(query.Language, ",")...)
 	}
 	if query.License != "" {
-		tags = append(tags, query.License)
+		tags = append(tags, strings.Split(query.License, ",")...)
 	}
 	if query.Other != "" {
-		tags = append(tags, query.Other)
+		tags = append(tags, strings.Split(query.Other, ",")...)
 	}
 	if len(tags) > 0 {
 		db.Where(" t1.id in (select repo_id from repository_tag where tag_id in (?))", tags)

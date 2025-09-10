@@ -45,12 +45,12 @@ func (handler *AlayanewHandler) RepositoriesHandler(c echo.Context) error {
 	if sortDir != "asc" && sortDir != "desc" {
 		return util.ErrorRequestParam(c)
 	}
-	pipelineTag := c.QueryParam("pipeline_tag")
+	license := c.QueryParam("license")
 	library := c.QueryParam("library")
+	language := c.QueryParam("language")
+	pipelineTag := c.QueryParam("pipeline_tag")
 	apps := c.QueryParam("apps")
 	inferenceProvider := c.QueryParam("inference_provider")
-	language := c.QueryParam("language")
-	license := c.QueryParam("license")
 	other := c.QueryParam("other")
 	models, total, err := handler.repositoryService.RepositoryList(&query.ModelQuery{
 		InstanceId:        instanceId,
