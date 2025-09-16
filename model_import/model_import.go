@@ -135,51 +135,48 @@ func main() {
 	}
 
 	modelFileRecordDao := dao.NewModelFileRecordDao(baseData)
-	allCandidateEtags := make([]string, 0, len(allCandidateRecords))
-	for _, r := range allCandidateRecords {
-		allCandidateEtags = append(allCandidateEtags, r.Etag)
-	}
 
 	const batchSize = 1000
-	totalBatches := (len(allCandidateEtags) + batchSize - 1) / batchSize
-	existingEtags := make([]string, 0)
+	totalBatches := (len(allCandidateRecords) + batchSize - 1) / batchSize
+	existingRecords := make([]model.ModelFileRecord, 0)
 
-	zap.S().Infof("开始分批次查询Etag，共%d个Etag，分为%d批处理",
-		len(allCandidateEtags), totalBatches)
+	zap.S().Infof("开始分批次查询记录，共%d条记录，分为%d批处理",
+		len(allCandidateRecords), totalBatches)
 
 	for i := 0; i < totalBatches; i++ {
 		start := i * batchSize
 		end := start + batchSize
-		if end > len(allCandidateEtags) {
-			end = len(allCandidateEtags)
+		if end > len(allCandidateRecords) {
+			end = len(allCandidateRecords)
 		}
 
-		batchEtags := allCandidateEtags[start:end]
-		zap.S().Debugf("处理第%d/%d批Etag查询，处理范围：%d-%d，数量：%d",
-			i+1, totalBatches, start, end-1, len(batchEtags))
+		batchRecords := allCandidateRecords[start:end]
+		zap.S().Debugf("处理第%d/%d批记录查询，处理范围：%d-%d，数量：%d",
+			i+1, totalBatches, start, end-1, len(batchRecords))
 
-		batchExisting, err := modelFileRecordDao.ExistEtags(batchEtags)
+		batchExisting, err := modelFileRecordDao.ExistRecords(batchRecords)
 		if err != nil {
-			zap.S().Fatalf("查询第%d批Etag失败: %v", i+1, err)
+			zap.S().Fatalf("查询第%d批记录失败: %v", i+1, err)
 		}
 
-		existingEtags = append(existingEtags, batchExisting...)
+		existingRecords = append(existingRecords, batchExisting...)
 	}
 
-	zap.S().Infof("所有批次Etag查询完成，共找到%d个已存在的Etag", len(existingEtags))
-	existingEtagMap := make(map[string]struct{}, len(existingEtags))
-	for _, etag := range existingEtags {
-		existingEtagMap[etag] = struct{}{}
+	zap.S().Infof("所有批次记录查询完成，共找到%d个已存在的记录", len(existingRecords))
+	existingRecordMap := make(map[string]struct{}, len(existingRecords))
+	for _, r := range existingRecords {
+		key := fmt.Sprintf("%s-%s-%s-%s", r.Etag, r.Name, r.Org, r.Repo)
+		existingRecordMap[key] = struct{}{}
 	}
-	
+
 	newRecords := make([]model.ModelFileRecord, 0)
-	existingCandidateEtags := make([]string, 0)
 	for _, r := range allCandidateRecords {
-		if _, exists := existingEtagMap[r.Etag]; !exists {
+		key := fmt.Sprintf("%s-%s-%s-%s", r.Etag, r.Name, r.Org, r.Repo)
+		if _, exists := existingRecordMap[key]; !exists {
 			newRecords = append(newRecords, r)
 		} else {
-			existingCandidateEtags = append(existingCandidateEtags, r.Etag)
-			zap.S().Infof("Etag %s 已存在于数据库，无需重复添加", r.Etag)
+			zap.S().Infof("记录已存在 (etag: %s, name: %s, org: %s, repo: %s)，无需重复添加",
+				r.Etag, r.Name, r.Org, r.Repo)
 		}
 	}
 

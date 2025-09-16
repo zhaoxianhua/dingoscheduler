@@ -308,7 +308,7 @@ func main() {
 }
 
 func getOffsetValue(dataType, org, repo, etag string, fileSize int64) (int64, error) {
-	url := fmt.Sprintf("%s/api/%s/%s/%s/%s/%d", apiBaseURL, dataType, org, repo, etag, fileSize)
+	url := fmt.Sprintf("%s/api/fileOffset/%s/%s/%s/%s/%d", apiBaseURL, dataType, org, repo, etag, fileSize)
 	resp, err := http.Get(url)
 	if err != nil {
 		return 0, fmt.Errorf("API请求失败: %w", err)

@@ -264,3 +264,21 @@ func (d *ModelFileRecordDao) BatchQueryByIDs(ids []int64) ([]model.ModelFileReco
 
 	return records, nil
 }
+
+func (d *ModelFileRecordDao) ExistRecords(records []model.ModelFileRecord) ([]model.ModelFileRecord, error) {
+	if len(records) == 0 {
+		return []model.ModelFileRecord{}, nil
+	}
+	var existing []model.ModelFileRecord
+	db := d.baseData.BizDB.Model(&model.ModelFileRecord{}).Where("1 = 0")
+
+	for _, r := range records {
+		db = db.Or("etag = ? AND name = ? AND org = ? AND repo = ?",
+			r.Etag, r.Name, r.Org, r.Repo)
+	}
+
+	if err := db.Find(&existing).Error; err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
